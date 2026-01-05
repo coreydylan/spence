@@ -1,0 +1,387 @@
+{
+  "name": "Brown Butter Tahini Cabbage with Sumac & Mint",
+  "source": "justinesnacks.com",
+  "description": "Charred cabbage wedges served on sourdough toast with a nutty brown butter tahini sauce",
+  "yield": "6 servings",
+  "timing": {
+    "prep_minutes": 20,
+    "cook_minutes": 50,
+    "total_minutes": 70,
+    "notes": null
+  },
+
+  "equipment": [
+    {
+      "item": "Large high-sided sauté pan or skillet",
+      "required": true,
+      "notes": "For searing cabbage, must be oven-safe OR transfer to baking dish"
+    },
+    {
+      "item": "Large sauté pan",
+      "required": true,
+      "notes": "For brown butter sauce"
+    },
+    {
+      "item": "Baking sheet",
+      "required": false,
+      "alternative": "Use the oven-safe sauté pan"
+    },
+    {
+      "item": "Chef's knife",
+      "required": true,
+      "notes": null
+    },
+    {
+      "item": "Cutting board",
+      "required": true,
+      "notes": "Large enough for a whole cabbage"
+    },
+    {
+      "item": "Microplane or zester",
+      "required": true,
+      "notes": "For lemon zest"
+    },
+    {
+      "item": "Citrus juicer or reamer",
+      "required": false,
+      "alternative": "Squeeze by hand"
+    },
+    {
+      "item": "Small bowl",
+      "required": true,
+      "notes": "For prepped sumac and zest"
+    },
+    {
+      "item": "Toaster or grill",
+      "required": true,
+      "notes": "For sourdough"
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "cabbage",
+      "quantity_display": "1 large head",
+      "quantity_volume": null,
+      "quantity_weight_g": 900,
+      "prep": "cut into 8 wedges, core intact",
+      "notes": "Keep core intact so wedges hold together",
+      "category": "produce"
+    },
+    {
+      "item": "kosher salt",
+      "quantity_display": "to taste",
+      "quantity_volume": "1-2 teaspoons",
+      "quantity_weight_g": 6,
+      "prep": null,
+      "notes": "Diamond Crystal recommended",
+      "category": "spices"
+    },
+    {
+      "item": "extra-virgin olive oil",
+      "quantity_display": "a large glug",
+      "quantity_volume": "3-4 tablespoons",
+      "quantity_weight_g": 45,
+      "prep": null,
+      "notes": "For searing cabbage",
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "white wine vinegar",
+      "quantity_display": "2 tablespoons",
+      "quantity_volume": "2 tablespoons",
+      "quantity_weight_g": 30,
+      "prep": null,
+      "notes": null,
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "salted butter",
+      "quantity_display": "8 tablespoons (1 stick)",
+      "quantity_volume": "1/2 cup",
+      "quantity_weight_g": 113,
+      "prep": null,
+      "notes": "Salted butter is specified",
+      "category": "dairy"
+    },
+    {
+      "item": "tahini",
+      "quantity_display": "1/2 cup",
+      "quantity_volume": "1/2 cup",
+      "quantity_weight_g": 120,
+      "prep": null,
+      "notes": "Stir well before measuring",
+      "category": "pantry"
+    },
+    {
+      "item": "sumac",
+      "quantity_display": "1/2 teaspoon plus more for garnish",
+      "quantity_volume": "1 teaspoon total",
+      "quantity_weight_g": 3,
+      "prep": null,
+      "notes": "Reserve some for garnish",
+      "category": "spices"
+    },
+    {
+      "item": "lemon",
+      "quantity_display": "1 medium",
+      "quantity_volume": "3 tablespoons juice, 1 tablespoon zest",
+      "quantity_weight_g": 100,
+      "prep": "zested and juiced",
+      "notes": "Need both zest and juice",
+      "category": "produce"
+    },
+    {
+      "item": "fresh mint",
+      "quantity_display": "for garnishing",
+      "quantity_volume": "1/4 cup leaves",
+      "quantity_weight_g": 8,
+      "prep": "leaves picked",
+      "notes": null,
+      "category": "produce"
+    },
+    {
+      "item": "sourdough bread",
+      "quantity_display": "6 slices",
+      "quantity_volume": null,
+      "quantity_weight_g": 300,
+      "prep": "toasted",
+      "notes": "Toast just before serving",
+      "category": "pantry"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: get out 1 small bowl for the sumac-zest mixture, 1 small bowl or container for lemon juice, 1 small dish for garnish items, and a measuring cup. Clear your cutting board area for the cabbage.",
+      "outputs": ["staging area ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 2,
+      "notes": "Having everything ready prevents scrambling when the brown butter is at the critical moment"
+    },
+    {
+      "id": 2,
+      "instruction": "Cut cabbage into 8 wedges through the core, keeping core intact so wedges hold together",
+      "outputs": ["cabbage wedges"],
+      "container": "cutting board",
+      "station": "knife",
+      "time_minutes": 3,
+      "notes": "The core is essential - it holds the leaves together during searing and roasting"
+    },
+    {
+      "id": 3,
+      "instruction": "Season both sides of all cabbage wedges generously with kosher salt",
+      "outputs": ["seasoned cabbage wedges"],
+      "container": "cutting board",
+      "station": "prep-cooking",
+      "time_minutes": 2,
+      "notes": null
+    },
+    {
+      "id": 4,
+      "instruction": "Zest half of the lemon into the first small bowl",
+      "outputs": ["lemon zest"],
+      "container": "small bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Only need zest from half the lemon"
+    },
+    {
+      "id": 5,
+      "instruction": "Juice the entire lemon into a separate small bowl or container",
+      "outputs": ["lemon juice"],
+      "container": "small bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Will use half during cooking, half at the end"
+    },
+    {
+      "id": 6,
+      "instruction": "Measure 1/2 teaspoon sumac into the bowl with lemon zest. Measure additional sumac into the garnish dish.",
+      "outputs": ["sumac-zest mixture", "garnish sumac"],
+      "container": "small bowl",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "The garnish dish will hold sumac and mint for finishing"
+    },
+    {
+      "id": 7,
+      "instruction": "Pick mint leaves from stems, add to the garnish dish with reserved sumac",
+      "outputs": ["mint leaves"],
+      "container": "small dish",
+      "station": "knife",
+      "time_minutes": 2,
+      "notes": "Just the leaves, discard stems"
+    },
+    {
+      "id": 8,
+      "instruction": "Measure tahini into the measuring cup. Have ready near stove.",
+      "outputs": ["measured tahini"],
+      "container": "measuring cup",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "Stir tahini well in jar before measuring - oil separates"
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Preheat oven to 400°F (200°C) with rack in center position",
+      "time_minutes": 15,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Oven indicator shows preheated",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 2,
+      "instruction": "Heat olive oil in large high-sided sauté pan over medium heat",
+      "time_minutes": 3,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Oil shimmers and flows easily when pan is tilted",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Don't let oil smoke"
+    },
+    {
+      "id": 3,
+      "instruction": "Sear cabbage wedges in batches until nicely browned on both sides, about 4-5 minutes per side",
+      "time_minutes": 20,
+      "depends_on": [2],
+      "uses_outputs": ["seasoned cabbage wedges"],
+      "cues": {
+        "visual": "Deep golden-brown char marks, edges beginning to caramelize",
+        "audio": "Active sizzle when cabbage hits pan",
+        "aroma": "Sweet, slightly nutty cabbage smell"
+      },
+      "warnings": "Don't overcrowd pan - work in batches of 2-3 wedges"
+    },
+    {
+      "id": 4,
+      "instruction": "Nestle all seared cabbage wedges together in pan, drizzle with white wine vinegar",
+      "time_minutes": 1,
+      "depends_on": [3],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": "Brief sizzle from vinegar",
+        "aroma": "Sharp vinegar smell that quickly mellows"
+      },
+      "warnings": null
+    },
+    {
+      "id": 5,
+      "instruction": "Transfer pan to oven and roast for 30 minutes",
+      "time_minutes": 30,
+      "depends_on": [1, 4],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Cabbage is tender when pierced with a knife, edges deeply caramelized",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 6,
+      "instruction": "When cabbage has 15 minutes left, start the sauce: melt butter in a large sauté pan over medium heat, stirring occasionally, until milk solids turn golden then deep brown (4-5 minutes)",
+      "time_minutes": 5,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Butter foams, then foam subsides. Milk solids on bottom go from white → golden → amber brown",
+        "audio": "Crackling subsides as water cooks off",
+        "aroma": "Nutty, toasty, almost like hazelnuts"
+      },
+      "warnings": "Watch carefully - brown butter can burn quickly. Reduce heat if browning too fast."
+    },
+    {
+      "id": 7,
+      "instruction": "Reduce heat to low. Add sumac-zest mixture to brown butter and stir",
+      "time_minutes": 0.5,
+      "depends_on": [6],
+      "uses_outputs": ["sumac-zest mixture"],
+      "cues": {
+        "visual": "Sumac blooms and disperses into the butter",
+        "audio": "Brief sizzle",
+        "aroma": "Lemony, tangy note joins the nuttiness"
+      },
+      "warnings": null
+    },
+    {
+      "id": 8,
+      "instruction": "Add tahini to the pan and swirl to combine into a smooth sauce. Season with salt to taste. Keep warm over low heat.",
+      "time_minutes": 1,
+      "depends_on": [7],
+      "uses_outputs": ["measured tahini"],
+      "cues": {
+        "visual": "Sauce is smooth, creamy, and pourable",
+        "audio": null,
+        "aroma": "Rich, nutty, complex"
+      },
+      "warnings": "Don't let sauce boil or it may separate"
+    },
+    {
+      "id": 9,
+      "instruction": "Toast the sourdough bread",
+      "time_minutes": 3,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Golden brown, slightly crispy edges",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Time this so bread is warm when cabbage comes out"
+    },
+    {
+      "id": 10,
+      "instruction": "Remove cabbage from oven. Squeeze half the lemon juice over the wedges",
+      "time_minutes": 1,
+      "depends_on": [5],
+      "uses_outputs": ["lemon juice"],
+      "cues": {
+        "visual": null,
+        "audio": "Sizzle as juice hits hot cabbage",
+        "aroma": "Bright citrus"
+      },
+      "warnings": null
+    },
+    {
+      "id": 11,
+      "instruction": "Pour the warm sauce directly over the cabbage wedges, covering them as much as possible. Squeeze remaining lemon juice over top.",
+      "time_minutes": 1,
+      "depends_on": [8, 10],
+      "uses_outputs": ["lemon juice"],
+      "cues": {
+        "visual": "Sauce pools around and coats the wedges",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Place one cabbage wedge on each slice of toasted sourdough. Drizzle with any remaining sauce from the pan. Sprinkle with reserved sumac and scatter mint leaves over top. Serve immediately while warm.",
+    "make_ahead": "Cabbage can be seared ahead and refrigerated. Bring to room temperature before roasting. Make sauce fresh.",
+    "storage": "Best served immediately. Leftovers can be refrigerated for 2 days but will lose crispness."
+  },
+
+  "notes": [
+    "The brown butter is the star - don't rush it. You want deep amber, not just golden.",
+    "Salted butter is specified and recommended - it adds flavor to the sauce.",
+    "The core of the cabbage is essential - it holds the wedges together.",
+    "If your pan isn't oven-safe, transfer seared cabbage to a baking dish before roasting."
+  ]
+}

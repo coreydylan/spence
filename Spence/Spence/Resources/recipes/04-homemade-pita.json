@@ -1,0 +1,410 @@
+{
+  "name": "Homemade Pita Bread",
+  "source": "cooking.nytimes.com",
+  "description": "Soft, puffy pita breads that puff up beautifully in a hot oven",
+  "yield": "8 six-inch pitas",
+  "timing": {
+    "prep_minutes": 30,
+    "cook_minutes": 25,
+    "total_minutes": 120,
+    "notes": "Includes 1 hour rise time and 10 minute rest periods"
+  },
+
+  "equipment": [
+    {
+      "item": "Large mixing bowl",
+      "required": true,
+      "notes": "For making dough and rising"
+    },
+    {
+      "item": "Whisk",
+      "required": true,
+      "notes": "For sponge"
+    },
+    {
+      "item": "Wooden spoon or chopsticks",
+      "required": true,
+      "notes": "For mixing shaggy dough"
+    },
+    {
+      "item": "Clean work surface",
+      "required": true,
+      "notes": "For kneading"
+    },
+    {
+      "item": "Plastic wrap",
+      "required": true,
+      "notes": "For covering bowl during rise"
+    },
+    {
+      "item": "Clean kitchen towel",
+      "required": true,
+      "notes": "For covering dough balls"
+    },
+    {
+      "item": "Rolling pin",
+      "required": true,
+      "notes": null
+    },
+    {
+      "item": "Heavy-duty baking sheet, cast iron pan, or ceramic baking tile",
+      "required": true,
+      "notes": "Must be able to get very hot - preheated in oven"
+    },
+    {
+      "item": "Tongs or spatula",
+      "required": true,
+      "notes": "For flipping pitas"
+    },
+    {
+      "item": "Napkin-lined basket or bowl",
+      "required": true,
+      "notes": "For keeping pitas warm and soft"
+    },
+    {
+      "item": "Bench scraper",
+      "required": false,
+      "alternative": "Use knife to divide dough"
+    },
+    {
+      "item": "Instant-read thermometer",
+      "required": false,
+      "alternative": "Test water temperature by touch - should be warm, not hot"
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "lukewarm water",
+      "quantity_display": "1 cup",
+      "quantity_volume": "1 cup",
+      "quantity_weight_g": 240,
+      "prep": null,
+      "notes": "About 100-110°F - warm to touch, not hot",
+      "category": "other"
+    },
+    {
+      "item": "active dry yeast",
+      "quantity_display": "2 teaspoons",
+      "quantity_volume": "2 teaspoons",
+      "quantity_weight_g": 7,
+      "prep": null,
+      "notes": "Check expiration date",
+      "category": "pantry"
+    },
+    {
+      "item": "sugar",
+      "quantity_display": "1/2 teaspoon",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 2,
+      "prep": null,
+      "notes": "Feeds the yeast",
+      "category": "pantry"
+    },
+    {
+      "item": "whole wheat flour",
+      "quantity_display": "35 grams (1/4 cup)",
+      "quantity_volume": "1/4 cup",
+      "quantity_weight_g": 35,
+      "prep": null,
+      "notes": "Freshly milled preferred but any whole wheat works",
+      "category": "pantry"
+    },
+    {
+      "item": "all-purpose flour",
+      "quantity_display": "310 grams (2 1/2 cups)",
+      "quantity_volume": "2 1/2 cups",
+      "quantity_weight_g": 310,
+      "prep": null,
+      "notes": "Unbleached preferred. Reserve 1/2 cup for kneading.",
+      "category": "pantry"
+    },
+    {
+      "item": "kosher salt",
+      "quantity_display": "1 teaspoon",
+      "quantity_volume": "1 teaspoon",
+      "quantity_weight_g": 3,
+      "prep": null,
+      "notes": null,
+      "category": "spices"
+    },
+    {
+      "item": "olive oil",
+      "quantity_display": "2 tablespoons",
+      "quantity_volume": "2 tablespoons",
+      "quantity_weight_g": 27,
+      "prep": null,
+      "notes": null,
+      "category": "oils-vinegars"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: clear a large section of counter for kneading. Get out your large mixing bowl, measuring cups and spoons, and a clean kitchen towel.",
+      "outputs": ["staging area ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 2,
+      "notes": "You'll need space for kneading and for 8 dough balls to rest"
+    },
+    {
+      "id": 2,
+      "instruction": "Measure 1 cup lukewarm water into the large mixing bowl. Water should feel warm but not hot - about bath temperature.",
+      "outputs": ["measured water"],
+      "container": "large bowl",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "Water that's too hot will kill the yeast; too cold won't activate it"
+    },
+    {
+      "id": 3,
+      "instruction": "Measure the yeast and sugar. Have them ready near the bowl.",
+      "outputs": ["measured yeast", "measured sugar"],
+      "container": "original container",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": null
+    },
+    {
+      "id": 4,
+      "instruction": "Measure the whole wheat flour and 1/4 cup of the all-purpose flour into a small bowl for the sponge",
+      "outputs": ["sponge flour"],
+      "container": "small bowl",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "This makes the initial sponge mixture"
+    },
+    {
+      "id": 5,
+      "instruction": "Measure remaining 2 cups all-purpose flour into a medium bowl. Reserve 1/2 cup in a separate small bowl for kneading.",
+      "outputs": ["main flour", "reserved flour"],
+      "container": "medium bowl",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "Keep reserved flour handy for kneading and rolling"
+    },
+    {
+      "id": 6,
+      "instruction": "Measure olive oil and salt, keep near the main flour",
+      "outputs": ["measured oil", "measured salt"],
+      "container": "original container",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": null
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Make the sponge: Add yeast and sugar to the lukewarm water in the large bowl. Stir to dissolve.",
+      "time_minutes": 1,
+      "depends_on": [],
+      "uses_outputs": ["measured water", "measured yeast", "measured sugar"],
+      "cues": {
+        "visual": "Yeast dissolves into water, mixture is cloudy",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "If yeast doesn't activate (foam) after 15 minutes, it's dead - start over with fresh yeast"
+    },
+    {
+      "id": 2,
+      "instruction": "Add the sponge flour (whole wheat + 1/4 cup AP flour) to the yeast water. Whisk to combine into a thin batter.",
+      "time_minutes": 1,
+      "depends_on": [1],
+      "uses_outputs": ["sponge flour"],
+      "cues": {
+        "visual": "Smooth, thin batter with no dry lumps",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 3,
+      "instruction": "Place bowl in a warm spot, uncovered. Let sit until frothy and bubbling.",
+      "time_minutes": 15,
+      "depends_on": [2],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Surface is covered with foam and bubbles, volume has increased",
+        "audio": "Tiny crackling sounds if you listen closely",
+        "aroma": "Yeasty, slightly beer-like"
+      },
+      "warnings": "Don't rush this - the sponge develops flavor"
+    },
+    {
+      "id": 4,
+      "instruction": "Add salt, olive oil, and nearly all of the main flour (reserve about 1/2 cup). Stir with wooden spoon until mixture forms a shaggy mass.",
+      "time_minutes": 2,
+      "depends_on": [3],
+      "uses_outputs": ["main flour", "measured oil", "measured salt"],
+      "cues": {
+        "visual": "Ragged, shaggy dough - not smooth yet",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Don't add all the flour - you need to adjust as you knead"
+    },
+    {
+      "id": 5,
+      "instruction": "Dust dough with a little reserved flour. Knead briefly in the bowl for 1 minute, incorporating any stray dry bits.",
+      "time_minutes": 1,
+      "depends_on": [4],
+      "uses_outputs": ["reserved flour"],
+      "cues": {
+        "visual": "Dough starts to come together, still rough",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 6,
+      "instruction": "Turn dough onto clean work surface. Knead lightly for 2 minutes until smooth. Cover with towel and let rest 10 minutes.",
+      "time_minutes": 12,
+      "depends_on": [5],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Dough is smooth and soft, slightly tacky but not sticky",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Resist adding too much flour - dough should be soft and slightly moist"
+    },
+    {
+      "id": 7,
+      "instruction": "Knead again for 2 minutes. The dough should be smooth, soft, and pliable.",
+      "time_minutes": 2,
+      "depends_on": [6],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Smooth, elastic dough that springs back when poked",
+        "audio": null,
+        "aroma": "Pleasant yeasty smell"
+      },
+      "warnings": null
+    },
+    {
+      "id": 8,
+      "instruction": "Clean the mixing bowl, return dough to it. Cover tightly with plastic wrap, then cover with towel. Place in warm spot to rise until doubled.",
+      "time_minutes": 60,
+      "depends_on": [7],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Dough has doubled in size, looks puffy",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Rise time varies with room temperature - could be 45 min to 1.5 hours"
+    },
+    {
+      "id": 9,
+      "instruction": "About 30 minutes before dough is ready, preheat oven to 475°F. Place heavy baking sheet, cast iron pan, or baking tile on bottom shelf to preheat.",
+      "time_minutes": 30,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Oven is fully preheated, baking surface is screaming hot",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "The baking surface MUST be fully preheated for pitas to puff"
+    },
+    {
+      "id": 10,
+      "instruction": "Punch down risen dough. Divide into 8 equal pieces using bench scraper or knife. Form each piece into a small ball.",
+      "time_minutes": 3,
+      "depends_on": [8],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "8 smooth, even-sized balls",
+        "audio": "Satisfying thump when you punch down the dough",
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 11,
+      "instruction": "Place dough balls on work surface, cover with damp towel. Let rest 10 minutes.",
+      "time_minutes": 10,
+      "depends_on": [10],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Dough balls have relaxed and spread slightly",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "This rest makes rolling easier - don't skip it"
+    },
+    {
+      "id": 12,
+      "instruction": "Prepare a napkin-lined basket or bowl to hold finished pitas.",
+      "time_minutes": 1,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 13,
+      "instruction": "Take one dough ball (keep others covered). Press into a flat disk with your palm, then roll with rolling pin to 6-inch circle, then to 8-inch diameter, about 1/8 inch thick. Dust with flour as needed.",
+      "time_minutes": 1,
+      "depends_on": [11],
+      "uses_outputs": ["reserved flour"],
+      "cues": {
+        "visual": "Thin, even circle - will shrink slightly when baked",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Work quickly - dough dries out. If it springs back too much, let it rest another minute."
+    },
+    {
+      "id": 14,
+      "instruction": "Carefully lift dough circle and place quickly on hot baking surface. Bake 2 minutes until puffed, then flip with tongs and bake 1 minute more.",
+      "time_minutes": 3,
+      "depends_on": [9, 13],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Pita puffs dramatically into a balloon, surface has a few brown speckles but is mostly pale",
+        "audio": null,
+        "aroma": "Fresh bread smell"
+      },
+      "warnings": "The pita should be pale with only a few spots - don't over-brown"
+    },
+    {
+      "id": 15,
+      "instruction": "Transfer hot pita to napkin-lined basket, cover immediately to keep soft. Repeat rolling and baking with remaining dough balls.",
+      "time_minutes": 25,
+      "depends_on": [12, 14],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "All 8 pitas puffed and stacked in basket",
+        "audio": null,
+        "aroma": "Wonderful fresh bread aroma"
+      },
+      "warnings": "Keep finished pitas covered so they stay soft"
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Serve warm. Pitas can be cut in half to form pockets for filling, or used whole for wrapping or dipping.",
+    "make_ahead": "Dough can be refrigerated overnight after initial kneading - bring to room temperature before shaping. Baked pitas are best fresh.",
+    "storage": "Store baked pitas in plastic bag at room temperature for 2 days. Freeze for up to 1 month. Reheat briefly in warm oven or toaster to refresh."
+  },
+
+  "notes": [
+    "The hot baking surface is the key to puffing - don't skip the preheat",
+    "Soft, moist dough makes tender pitas - resist over-flouring",
+    "If pitas don't puff: oven not hot enough, baking surface not hot enough, or dough rolled too thick",
+    "The sponge step develops flavor - don't skip the 15 minute wait",
+    "Rolling to 8 inches accounts for shrinkage during baking"
+  ]
+}

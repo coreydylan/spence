@@ -1,0 +1,279 @@
+{
+  "name": "Ottolenghi's Burrata with Grilled Grapes & Basil",
+  "source": "food52.com",
+  "description": "Creamy burrata with blistered grapes in a sherry vinegar marinade, topped with toasted fennel",
+  "yield": "6 servings as a starter",
+  "timing": {
+    "prep_minutes": 15,
+    "cook_minutes": 5,
+    "total_minutes": 80,
+    "notes": "Includes 1 hour minimum marinating time"
+  },
+
+  "equipment": [
+    {
+      "item": "Medium mixing bowl",
+      "required": true,
+      "notes": "For marinating grapes"
+    },
+    {
+      "item": "Wooden or metal skewers",
+      "required": true,
+      "notes": "6-8 skewers - if using wooden, soak in water 30 minutes first"
+    },
+    {
+      "item": "Grill pan",
+      "required": true,
+      "notes": "Cast iron preferred for high heat"
+    },
+    {
+      "item": "Tongs",
+      "required": true,
+      "notes": "For turning skewers"
+    },
+    {
+      "item": "Small dry skillet",
+      "required": true,
+      "notes": "For toasting fennel seeds"
+    },
+    {
+      "item": "Mortar and pestle",
+      "required": false,
+      "alternative": "Crush fennel seeds with bottom of pan or knife"
+    },
+    {
+      "item": "Serving plates or platter",
+      "required": true,
+      "notes": "6 individual plates or one large platter"
+    },
+    {
+      "item": "Measuring spoons",
+      "required": true,
+      "notes": null
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "seedless red grapes",
+      "quantity_display": "11 1/4 ounces",
+      "quantity_volume": "about 2 cups",
+      "quantity_weight_g": 320,
+      "prep": "pulled off vine",
+      "notes": "Firm, seedless grapes work best",
+      "category": "produce"
+    },
+    {
+      "item": "sherry vinegar",
+      "quantity_display": "2 tablespoons",
+      "quantity_volume": "2 tablespoons",
+      "quantity_weight_g": 30,
+      "prep": null,
+      "notes": "Valdespino or other quality sherry vinegar",
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "olive oil",
+      "quantity_display": "3 tablespoons",
+      "quantity_volume": "3 tablespoons",
+      "quantity_weight_g": 40,
+      "prep": null,
+      "notes": "Good quality extra-virgin",
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "garlic",
+      "quantity_display": "1 clove",
+      "quantity_volume": "1 teaspoon crushed",
+      "quantity_weight_g": 5,
+      "prep": "crushed",
+      "notes": "Crush with side of knife",
+      "category": "produce"
+    },
+    {
+      "item": "dark brown sugar",
+      "quantity_display": "1 1/2 teaspoons",
+      "quantity_volume": "1 1/2 teaspoons",
+      "quantity_weight_g": 10,
+      "prep": null,
+      "notes": null,
+      "category": "pantry"
+    },
+    {
+      "item": "fennel seeds",
+      "quantity_display": "1 1/2 teaspoons",
+      "quantity_volume": "1 1/2 teaspoons",
+      "quantity_weight_g": 3,
+      "prep": "toasted and lightly crushed",
+      "notes": "Toast first, then crush",
+      "category": "spices"
+    },
+    {
+      "item": "flaked sea salt",
+      "quantity_display": "1/4 teaspoon plus more",
+      "quantity_volume": "1/4 teaspoon",
+      "quantity_weight_g": 1,
+      "prep": null,
+      "notes": "Maldon or similar",
+      "category": "spices"
+    },
+    {
+      "item": "black pepper",
+      "quantity_display": "plenty",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 1,
+      "prep": "freshly ground",
+      "notes": "Be generous",
+      "category": "spices"
+    },
+    {
+      "item": "burrata",
+      "quantity_display": "3 large balls",
+      "quantity_volume": "3 balls (about 4 oz each)",
+      "quantity_weight_g": 340,
+      "prep": null,
+      "notes": "Or substitute buffalo mozzarella",
+      "category": "dairy"
+    },
+    {
+      "item": "purple or green basil",
+      "quantity_display": "6 small sprigs",
+      "quantity_volume": "6 sprigs",
+      "quantity_weight_g": 6,
+      "prep": null,
+      "notes": "Purple basil is beautiful here but regular works",
+      "category": "produce"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: get out a medium bowl for marinating, your skewers, and measuring spoons. If using wooden skewers, soak them in water now.",
+      "outputs": ["staging area ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 2,
+      "notes": "Soaking wooden skewers prevents them from burning"
+    },
+    {
+      "id": 2,
+      "instruction": "Pull grapes off the vine and place in the medium bowl",
+      "outputs": ["grapes"],
+      "container": "medium bowl",
+      "station": "knife",
+      "time_minutes": 2,
+      "notes": "Discard any soft or split grapes"
+    },
+    {
+      "id": 3,
+      "instruction": "Crush the garlic clove with the flat side of your knife (peel will come off easily after crushing)",
+      "outputs": ["crushed garlic"],
+      "container": "medium bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Add directly to bowl with grapes"
+    },
+    {
+      "id": 4,
+      "instruction": "Toast fennel seeds in dry skillet over medium heat until fragrant, about 2 minutes. Transfer to mortar and lightly crush (or crush with knife/pan bottom). Measure out 1 teaspoon for marinade, reserve 1/2 teaspoon for garnish.",
+      "outputs": ["crushed fennel for marinade", "crushed fennel for garnish"],
+      "container": "small bowl",
+      "station": "prep-cooking",
+      "time_minutes": 3,
+      "notes": "Don't over-crush - you want texture, not powder"
+    },
+    {
+      "id": 5,
+      "instruction": "Add to the bowl with grapes: sherry vinegar, olive oil, brown sugar, 1 teaspoon of the toasted fennel seeds, 1/4 teaspoon flaked salt, and plenty of black pepper. Mix well.",
+      "outputs": ["grape marinade"],
+      "container": "medium bowl",
+      "station": "mixing",
+      "time_minutes": 2,
+      "notes": "Everything marinates together"
+    },
+    {
+      "id": 6,
+      "instruction": "Cover and marinate grapes for at least 1 hour at room temperature, or up to 1 day in the refrigerator",
+      "outputs": ["marinated grapes"],
+      "container": "medium bowl",
+      "station": "prep-cooking",
+      "time_minutes": 60,
+      "notes": "The longer the better - overnight is great. Reserve the marinade!"
+    },
+    {
+      "id": 7,
+      "instruction": "Thread 5-6 marinated grapes onto each skewer. Keep the marinade - you'll need it for serving.",
+      "outputs": ["grape skewers"],
+      "container": "sheet pan",
+      "station": "prep-cooking",
+      "time_minutes": 3,
+      "notes": "Don't pack grapes too tightly - leave small gaps"
+    },
+    {
+      "id": 8,
+      "instruction": "Take burrata out of refrigerator 20 minutes before serving to bring to room temperature",
+      "outputs": ["room temp burrata"],
+      "container": "original container",
+      "station": "setup",
+      "time_minutes": 1,
+      "notes": "Cold burrata doesn't have the same creamy texture"
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Heat grill pan over high heat until very hot. Make sure kitchen is well ventilated - this will smoke.",
+      "time_minutes": 5,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Pan is slightly smoking, a drop of water evaporates instantly",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Turn on exhaust fan - grilling grapes creates smoke"
+    },
+    {
+      "id": 2,
+      "instruction": "Add grape skewers to hot grill pan in batches (don't overcrowd). Grill for 2-3 minutes total, turning once after about 1.5 minutes.",
+      "time_minutes": 3,
+      "depends_on": [1],
+      "uses_outputs": ["grape skewers"],
+      "cues": {
+        "visual": "Grapes are blistered and have light char marks, skins splitting slightly",
+        "audio": "Sizzling and some popping",
+        "aroma": "Sweet, caramelized grape smell"
+      },
+      "warnings": "Don't overcook - grapes should still hold their shape"
+    },
+    {
+      "id": 3,
+      "instruction": "Remove skewers from heat and set aside briefly while you plate",
+      "time_minutes": 0.5,
+      "depends_on": [2],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Tear each ball of burrata in half and place one half on each plate (or arrange on platter). Lean 2 grape skewers against each portion of burrata. Spoon about 1 1/2 teaspoons of the reserved marinade over each cheese portion. Sprinkle the remaining 1/2 teaspoon crushed fennel seeds over all portions. Garnish each plate with a sprig of basil. Serve immediately while grapes are still warm.",
+    "make_ahead": "Grapes can marinate up to 1 day ahead. Grill just before serving. Burrata should be fresh.",
+    "storage": "This dish doesn't keep well - serve immediately. Leftover marinade can be used as salad dressing."
+  },
+
+  "notes": [
+    "The contrast of warm blistered grapes against cool creamy burrata is essential",
+    "Don't skip marinating time - it develops the flavor",
+    "Valdespino sherry vinegar is specified but any quality sherry vinegar works",
+    "Purple basil makes it stunning but green basil tastes the same",
+    "Can be scaled up easily for a crowd - use a large platter for presentation"
+  ]
+}
