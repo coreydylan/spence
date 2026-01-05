@@ -1,0 +1,59 @@
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+*.xcuserstate
+*.xcuserdatad/
+*.playground/*
+!*.playground/Contents.swift
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.xcscheme
+Pods/
+Carthage/Build/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets
+*.pem
+*.p12
+*.key
+secrets/
