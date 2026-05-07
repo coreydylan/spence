@@ -784,7 +784,7 @@ function rebuildShoppingListClone(pre: MiseWeeklyPlanDraft): MiseWeeklyPlanDraft
 	return cloned;
 }
 
-function rebuildShoppingList(plan: MiseWeeklyPlanDraft): void {
+export function rebuildShoppingList(plan: MiseWeeklyPlanDraft): void {
 	const llmRaw: ComposerRawIngredient[] = [
 		...(plan.meals_by_day || []).flatMap(d => d.meals.flatMap(m => m.raw_ingredients || [])),
 		...(plan.breakfasts || []).flatMap(b => b.raw_ingredients || []),

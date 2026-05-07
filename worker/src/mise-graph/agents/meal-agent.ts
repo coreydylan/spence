@@ -67,6 +67,12 @@ export interface MealAgentState {
 	location: LocationContext | null;
 	adult_member_ids: string[];
 	next_alarm_at_ms: number | null;
+	// Surfaced cook/eat windows so chef-of-staff agents can drive real
+	// timing without poking at the embedded SQLite snapshot.
+	cook_window_start_ms: number | null;
+	cook_window_end_ms: number | null;
+	eat_window_start_ms: number | null;
+	eat_window_end_ms: number | null;
 }
 
 const INITIAL_STATE: MealAgentState = {
@@ -84,6 +90,10 @@ const INITIAL_STATE: MealAgentState = {
 	location: null,
 	adult_member_ids: [],
 	next_alarm_at_ms: null,
+	cook_window_start_ms: null,
+	cook_window_end_ms: null,
+	eat_window_start_ms: null,
+	eat_window_end_ms: null,
 };
 
 interface InitBody {
@@ -315,6 +325,10 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			initialized_at_ms: now_ms,
 			location: body.location || null,
 			adult_member_ids: Array.isArray(body.adult_member_ids) ? body.adult_member_ids : [],
+			cook_window_start_ms: snapshot.cook_window_start_ms,
+			cook_window_end_ms: snapshot.cook_window_end_ms,
+			eat_window_start_ms: snapshot.eat_window_start_ms,
+			eat_window_end_ms: snapshot.eat_window_end_ms,
 		});
 
 		// Kick off the alarm chain — schedule the next phase based on

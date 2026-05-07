@@ -47,6 +47,7 @@ import {
 	previewSlidePrepDate,
 	previewSplitBatch,
 	previewSwapIngredient,
+	rebuildShoppingList,
 	type RipplePreview,
 } from "./ripple-preview";
 import { runHardCritics, runWarningCritics, type Grievance, type GrievanceSeverity } from "./critics";
@@ -526,6 +527,11 @@ async function toolReadSummary(args: Record<string, unknown>, env: MiseGraphEnv)
 async function toolFinalize(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
 	const planId = requireString(args.plan_id, "plan_id");
 	const world = await loadWorld(env, planId);
+	// Safety net: if shop_runs is empty (e.g. plan was composed via earlier
+	// tool versions that didn't rebuild on insert), regenerate before finalize.
+	if (!world.plan.shop_runs || world.plan.shop_runs.length === 0) {
+		rebuildShoppingList(world.plan);
+	}
 	const result = planFinalize(world);
 	await markActivePlanFinal(env, planId, world.plan);
 	// Wave 7B Phase 2: drive the PlanAgent to spawn child meal/shop agents.
@@ -745,6 +751,10 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 	const beforeIds = new Set(beforeGrievances.map(grievanceKey));
 
 	const updated = insertMealAtSlot(plan, slot, mealInput);
+	// Rebuild shopping_list + shop_runs after the insert. Otherwise compose-only
+	// flows (which never go through ripple-preview's apply path) leave the plan
+	// with empty shop_runs and a stale shopping list.
+	rebuildShoppingList(updated);
 	const afterGrievances = safeRunCritics(updated);
 	const afterIds = new Set(afterGrievances.map(grievanceKey));
 
