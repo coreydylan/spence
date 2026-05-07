@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.open-next/
+.vercel/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+storybook-static/
+coverage/

@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/*
+ * Spence design tokens.
+ * Tailwind v4 reads these directly via @theme — utilities like `bg-terracotta`,
+ * `text-ink`, `font-serif`, `rounded-lg` are auto-generated.
+ */
+@theme {
+  --color-terracotta: #E07856;
+  --color-terracotta-soft: #F2A98A;
+  --color-cream: #F8F3EC;
+  --color-cream-deep: #EFE7DA;
+  --color-ink: #2A1E15;
+  --color-ink-soft: #5C4A3D;
+  --color-sage: #3F6E4A;
+  --color-sage-soft: #8AB392;
+  --color-amber: #C8893A;
+  --color-amber-soft: #E8C490;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-mono: "Fira Code", ui-monospace, "SF Mono", monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+
+  --shadow-soft: 0 4px 12px rgba(42, 30, 21, 0.04);
+  --shadow-card: 0 8px 24px rgba(42, 30, 21, 0.06);
+
+  /* Cook-mode dark palette (kitchens have bright overhead light, dark UI is
+     easier to glance at mid-cook). All deep ink shades. */
+  --color-ink-deep: #1A1410;       /* full-bleed bg */
+  --color-ink-surface: #2A1E15;    /* cards / surfaces */
+  --color-ink-surface-2: #3A2A1F;  /* raised / hover surfaces */
+  --color-cream-dim: #C9B8A6;      /* primary text on dark */
+  --color-cream-faint: #8A7A6A;    /* secondary text on dark */
+}
+
+/* Base reset / typography defaults */
+html, body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+::selection {
+  background-color: var(--color-terracotta);
+  color: var(--color-cream);
+}
+
+/* Subtle scrollbar styling for the chat surface */
+.scroll-soft {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-cream-deep) transparent;
+}
+.scroll-soft::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-soft::-webkit-scrollbar-thumb {
+  background: var(--color-cream-deep);
+  border-radius: 3px;
+}
+
+/* Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.animate-pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 240ms ease-out both; }
+
+@keyframes step-slide {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-step-slide {
+  animation: step-slide 280ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  /* Honor reduced-motion users — flash to final state. */
+}
+
+/* Terracotta-tinted shimmer for skeleton placeholders */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.animate-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(224, 120, 86, 0.10) 35%,
+    rgba(224, 120, 86, 0.18) 50%,
+    rgba(224, 120, 86, 0.10) 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Slide up from bottom — used for toasts. */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-step-slide,
+  .animate-fade-up,
+  .animate-shimmer,
+  .animate-slide-up,
+  .animate-pulse-dot {
+    animation: none !important;
+  }
+}
+
+/* ── Dark mode ────────────────────────────────────────────────────────────
+ * Activated via either `data-theme="dark"` (cookie override) or, when no
+ * override is set, the user's `prefers-color-scheme: dark`. Components opt-in
+ * with Tailwind `dark:` variants — but the html/body defaults below also flip.
+ *
+ * The Tailwind v4 `@custom-variant` block redefines the `dark:` variant to
+ * trigger on either of those signals.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]),
+  html:not([data-theme="light"]) body {
+    background-color: var(--color-ink-deep);
+    color: var(--color-cream-dim);
+  }
+  html:not([data-theme="light"]) ::selection {
+    background-color: var(--color-terracotta);
+    color: var(--color-ink-deep);
+  }
+}
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+  background-color: var(--color-ink-deep);
+  color: var(--color-cream-dim);
+}
+html[data-theme="dark"] ::selection {
+  background-color: var(--color-terracotta);
+  color: var(--color-ink-deep);
+}
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+}
+
+/* Cook-mode surface — full-bleed dark canvas. Used by `app/cook/[id]/layout.tsx`
+   to flip the entire viewport into kitchen mode (dark, big text, no chrome). */
+.cook-bg {
+  background:
+    radial-gradient(ellipse 80% 30% at 50% 0%, rgba(224, 120, 86, 0.08), transparent 70%),
+    linear-gradient(180deg, var(--color-ink-deep) 0%, #100C09 100%);
+  color: var(--color-cream-dim);
+  min-height: 100dvh;
+}
+
+/* Active task glow — subtle terracotta halo around the card the cook should
+   be looking at right now. Honors reduced-motion (no breathing). */
+.cook-active-glow {
+  box-shadow: 0 0 0 1px rgba(224, 120, 86, 0.55),
+              0 0 28px rgba(224, 120, 86, 0.18);
+  animation: cook-glow 2.6s ease-in-out infinite;
+}
+@keyframes cook-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(224, 120, 86, 0.45),
+                         0 0 22px rgba(224, 120, 86, 0.14); }
+  50%      { box-shadow: 0 0 0 1px rgba(224, 120, 86, 0.65),
+                         0 0 34px rgba(224, 120, 86, 0.24); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cook-active-glow { animation: none !important; }
+}
+
+/* MessageGroup: collapse the inner ChefBubble avatar for non-first-in-group
+   Spence messages so consecutive replies stack under a single avatar. */
+.spence-avatar-hidden > div > div:first-child {
+  visibility: hidden;
+}
+
+/* Onboarding ambient background — soft cream gradient with a faint warm wash. */
+.onboarding-bg {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(224, 120, 86, 0.10), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 100% 100%, rgba(63, 110, 74, 0.06), transparent 70%),
+    linear-gradient(180deg, var(--color-cream) 0%, var(--color-cream-deep) 100%);
+  background-attachment: fixed;
+}
