@@ -1,0 +1,30 @@
+# Spence web app — deployed as a Cloudflare Worker (with static asset binding)
+# via @opennextjs/cloudflare v0.4+. The legacy Pages approach is deprecated for
+# Next.js apps; the Worker model is the supported path.
+#
+# One-time setup:
+#   1. Cloudflare Access policy on the Worker's *.workers.dev domain (or a
+#      custom domain) restricting to me@coreydylan.net or the team domain.
+#      CF Access injects the Cf-Access-Authenticated-User-Email header that
+#      lib/auth.ts reads.
+#   2. wrangler secret put ANTHROPIC_API_KEY
+#   3. (optional) Set NEXT_PUBLIC_WORKER_URL to the production mise-graph URL
+#      via `wrangler secret put NEXT_PUBLIC_WORKER_URL`.
+#
+# Deploy:
+#   npm run pages:build && npm run pages:deploy
+# (Names are kept "pages:*" for muscle memory; the underlying transport is
+#  the Worker model. Renaming would churn other docs.)
+#
+# Local dev:
+#   npm run dev          ← standard Next.js dev server, no wrangler
+# Set DEV_USER_EMAIL in .env.local for the auth fallback.
+
+name = "spence-web"
+main = ".open-next/worker.js"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
