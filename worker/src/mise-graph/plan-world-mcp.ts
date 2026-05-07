@@ -73,6 +73,7 @@ import {
 	inspireReadSeasonality,
 	inspireReadTasteFeedback,
 } from "./inspire-tools";
+import { inspireReadRecipeSteps } from "./recipe-lookup";
 import { fetchWeatherForecast } from "./weather-tools";
 import {
 	addCalendarBlock,
@@ -380,6 +381,8 @@ export async function callPlanWorldTool(
 			return await inspireReadCanonicalDishes(env, args as Parameters<typeof inspireReadCanonicalDishes>[1]) as unknown as Record<string, unknown>;
 		case "inspire_read_canonical_components":
 			return await inspireReadCanonicalComponents(env, args as Parameters<typeof inspireReadCanonicalComponents>[1]) as unknown as Record<string, unknown>;
+		case "inspire_read_recipe_steps":
+			return await inspireReadRecipeSteps(env, args as Parameters<typeof inspireReadRecipeSteps>[1]) as unknown as Record<string, unknown>;
 		case "inspire_read_flavor_compounds":
 			return await inspireReadFlavorCompounds(env, args as Parameters<typeof inspireReadFlavorCompounds>[1]) as unknown as Record<string, unknown>;
 		case "inspire_read_affinity_pairs":
@@ -1641,6 +1644,12 @@ function insertMealAtSlot(plan: MiseWeeklyPlanDraft, slot: PlanWorldSlotRef, mea
 		leftovers_to: leftoversTo,
 	};
 	if (formulaIds.length) (meal as MisePlanMeal & { formula_ids?: string[] }).formula_ids = formulaIds;
+	// Carry forward meta when the caller supplies it. Track D's equipment-
+	// claim path reads meal.meta.equipment from the snapshot, so dropping
+	// meta here means equipment never reaches the MealAgent.
+	if (isRecord(mealInput.meta)) {
+		(meal as MisePlanMeal & { meta?: Record<string, unknown> }).meta = mealInput.meta;
+	}
 
 	// Run the deterministic component fill so format slot specs get exercised
 	// even when the caller hands us only raw ingredients.
@@ -2891,6 +2900,15 @@ const PLAN_WORLD_TOOLS = [
 		properties: {
 			anchors: { type: "array", items: { type: "string" }, description: "Canonical INGREDIENT names. Empty array → top-N by recipe_count." },
 			limit: { type: "number", description: "Default 12." },
+		},
+	}),
+	tool("inspire_read_recipe_steps", "Read the real method steps + structured ingredient list for a single recipe from canonical_recipes_v2. Identify by recipe_id (e.g. 'banana_bread'), canonical_dish_id (joins through canonical_dishes), or canonical_dish_title (LIKE match). Returns {ok, recipe_id, title, ingredients, steps[].prose, total_time_min, servings, source_url}. Use this when briefing the cook or rendering a real walkthrough rather than a synthesized timeline. Returns {ok:false, message} when nothing matches.", {
+		type: "object",
+		properties: {
+			recipe_id: { type: "string", description: "Exact id of a row in canonical_recipes_v2 (e.g. 'banana_bread')." },
+			canonical_dish_id: { type: ["string", "number"], description: "ID of a canonical_dishes row — title is looked up and matched into canonical_recipes_v2." },
+			canonical_dish_title: { type: "string", description: "Free-text title (e.g. 'banana bread') — case-insensitive LIKE match." },
+			limit: { type: "number", description: "Reserved for future expansion. Currently returns at most 1 recipe per call." },
 		},
 	}),
 	tool("inspire_read_flavor_compounds", "Read FoodDB-style aromatic-compound pairings for a single ingredient. Returns ingredients that share volatile compounds (the foodpairing.com signal). Useful when the agent wants a non-obvious but molecularly-grounded match.", {

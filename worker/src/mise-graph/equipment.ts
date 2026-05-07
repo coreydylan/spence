@@ -150,6 +150,105 @@ export async function listEquipment(
 	}));
 }
 
+// ─── Lazy auto-definition (used by cook_window_entry & friends) ───────────
+//
+// Wave 7B Track D wires MealAgent.cook_window_entry to the real claim store.
+// Households often haven't pre-declared every piece of equipment a recipe
+// touches, so claims would fail with "no such equipment" before they could
+// even attempt to detect cross-meal conflicts. To keep the path forgiving we
+// auto-define equipment lazily the first time a slug is referenced for a
+// household, using a sensible default (exclusive vs. shared, capacity).
+
+const SHARED_EQUIPMENT_DEFAULTS: Record<string, { kind: EquipmentKind; capacity: number }> = {
+	stovetop:         { kind: "stove_burner",  capacity: 4 },
+	stove:            { kind: "stove_burner",  capacity: 4 },
+	stovetop_burner:  { kind: "stove_burner",  capacity: 4 },
+	stove_burner:     { kind: "stove_burner",  capacity: 4 },
+	stove_top:        { kind: "stove_burner",  capacity: 4 },
+	burner:           { kind: "stove_burner",  capacity: 4 },
+	burners:          { kind: "stove_burner",  capacity: 4 },
+	counter:          { kind: "counter_space", capacity: 2 },
+	counter_space:    { kind: "counter_space", capacity: 2 },
+	cutting_board:    { kind: "cutting_board", capacity: 2 },
+};
+
+const EXCLUSIVE_EQUIPMENT_KIND_HINTS: Array<[RegExp, EquipmentKind]> = [
+	[/oven/i,           "oven"],
+	[/instant.?pot/i,   "instant_pot"],
+	[/pressure/i,       "instant_pot"],
+	[/grill/i,          "grill"],
+	[/smoker/i,         "smoker"],
+	[/skillet/i,        "skillet"],
+	[/saucepan/i,       "saucepan"],
+	[/sauce.?pan/i,     "saucepan"],
+	[/fryer/i,          "fryer"],
+	[/blender/i,        "blender"],
+	[/food.?proc/i,     "food_processor"],
+	[/stand.?mixer/i,   "stand_mixer"],
+	[/mixer/i,          "stand_mixer"],
+	[/chef.?s.?knife/i, "chefs_knife"],
+	[/knife/i,          "chefs_knife"],
+	[/sink/i,           "sink_basin"],
+];
+
+/**
+ * Return a sensible default `EquipmentDefinition` for the given slug. Slugs
+ * containing "stove", "burner", or "counter" are treated as shared (capacity
+ * > 1); everything else defaults to exclusive (single claimant per window),
+ * which matches the conservative behaviour of `claimEquipment` when no row
+ * is found for a slug.
+ */
+export function defaultEquipmentDefinition(
+	slug: string,
+	household_id: string,
+): EquipmentDefinition {
+	const normalized = slug.trim().toLowerCase();
+	const shared = SHARED_EQUIPMENT_DEFAULTS[normalized];
+	if (shared) {
+		return {
+			slug,
+			kind: shared.kind,
+			household_id,
+			exclusive: false,
+			capacity: shared.capacity,
+			notes: "auto-defined by ensureEquipmentDefined",
+		};
+	}
+	let kind: EquipmentKind = "oven"; // safe exclusive default
+	for (const [re, hinted] of EXCLUSIVE_EQUIPMENT_KIND_HINTS) {
+		if (re.test(normalized)) { kind = hinted; break; }
+	}
+	return {
+		slug,
+		kind,
+		household_id,
+		exclusive: true,
+		notes: "auto-defined by ensureEquipmentDefined",
+	};
+}
+
+/**
+ * Idempotently ensure the named equipment slug has a definition row for the
+ * given household. If a definition already exists this is a no-op; otherwise
+ * a default definition is inserted via `defineEquipment`.
+ *
+ * Returns the resolved (existing or newly created) definition.
+ */
+export async function ensureEquipmentDefined(
+	env: MiseGraphEnv,
+	household_id: string,
+	slug: string,
+): Promise<EquipmentDefinition> {
+	if (!household_id) throw new Error("ensureEquipmentDefined: household_id required");
+	if (!slug || !slug.trim()) throw new Error("ensureEquipmentDefined: slug required");
+	await migrateEquipmentSchema(env);
+	const existing = await getDefinition(env, slug);
+	if (existing) return existing;
+	const def = defaultEquipmentDefinition(slug, household_id);
+	await defineEquipment(env, def);
+	return def;
+}
+
 async function getDefinition(
 	env: MiseGraphEnv,
 	slug: string,
@@ -299,7 +398,14 @@ export async function claimEquipment(
 					c.end_ts > req.start_ts &&
 					c.status === "held",
 				);
-			const overlapping = [...existing, ...inFlight];
+			// Skip overlaps that belong to the SAME (kind, id) — re-claiming
+			// our own claim is idempotent, not a conflict. This makes the
+			// cook_window_entry handler safe to re-run (e.g. when an alarm
+			// fires after a manual transition has already claimed).
+			const ownsClaim = (c: EquipmentClaim) =>
+				c.claim_for.kind === req.claim_for.kind &&
+				c.claim_for.id === req.claim_for.id;
+			const overlapping = [...existing, ...inFlight].filter(c => !ownsClaim(c));
 
 			const requestedClaim: EquipmentClaim = {
 				id: generateClaimId(),

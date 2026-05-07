@@ -32,6 +32,7 @@ import {
 } from "./base";
 import {
 	active_cook_entry,
+	adjustWindowsForPeopleAndCook,
 	archived_entry,
 	cancelled_entry,
 	cook_window_entry,
@@ -345,6 +346,46 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 		const initial_phase: MealPhase = body.initial_phase || "planned";
 		const now_ms = Date.now();
 
+		// Wave 7B Track B: people-aware cook window adjustment.
+		// Persist the snapshot above with raw slot-default windows (so D1
+		// stays canonical), then derive live cook_window_start from the
+		// people count + active-cook estimate. `adult_member_ids` is the
+		// best proxy we have for "who's eating tonight" until guests get a
+		// first-class slot in MealSnapshot. When no list is supplied we
+		// keep the raw window unchanged.
+		let adultIds = Array.isArray(body.adult_member_ids) ? body.adult_member_ids : [];
+		// When PlanAgent spawns MealAgent it doesn't know the household roster,
+		// so adult_member_ids arrives empty. Resolve from D1 — this lets the
+		// notification fan-out paths in Tracks C and D (cook_window member_call,
+		// pre_eve calendar_conflict, equipment_conflict) reach real adults
+		// instead of silently dropping rows on the NOT NULL member_id constraint.
+		if (adultIds.length === 0 && snapshot.household_id) {
+			try {
+				const rows = await this.env.DB.prepare(
+					"SELECT member_id FROM mise_household_members WHERE household_id = ? AND age_group = 'adult'",
+				).bind(snapshot.household_id).all<{ member_id: string }>();
+				adultIds = (rows.results || []).map(r => r.member_id).filter(Boolean);
+			} catch {
+				// Best effort — leave empty if the lookup fails.
+			}
+		}
+		// Track B people fallback chain: explicit adult_member_ids > meal.people
+		// from the snapshot > null (no adjustment).
+		const people = adultIds.length > 0
+			? adultIds.length
+			: (typeof snapshot.people === "number" && snapshot.people > 0 ? snapshot.people : null);
+		const cook_active_min = estimateCookMin(snapshot.format);
+		const adjusted = adjustWindowsForPeopleAndCook(
+			{
+				cook_window_start_ms: snapshot.cook_window_start_ms,
+				cook_window_end_ms: snapshot.cook_window_end_ms,
+				eat_window_start_ms: snapshot.eat_window_start_ms,
+				eat_window_end_ms: snapshot.eat_window_end_ms,
+			},
+			people,
+			cook_active_min,
+		);
+
 		this.setState({
 			...this.state,
 			meal_id,
@@ -355,23 +396,32 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			phase: initial_phase,
 			initialized_at_ms: now_ms,
 			location: body.location || null,
-			adult_member_ids: Array.isArray(body.adult_member_ids) ? body.adult_member_ids : [],
-			cook_window_start_ms: snapshot.cook_window_start_ms,
-			cook_window_end_ms: snapshot.cook_window_end_ms,
-			eat_window_start_ms: snapshot.eat_window_start_ms,
-			eat_window_end_ms: snapshot.eat_window_end_ms,
+			adult_member_ids: adultIds,
+			cook_window_start_ms: adjusted.cook_window_start_ms,
+			cook_window_end_ms: adjusted.cook_window_end_ms,
+			eat_window_start_ms: adjusted.eat_window_start_ms,
+			eat_window_end_ms: adjusted.eat_window_end_ms,
 			format: snapshot.format,
 			cuisine: snapshot.cuisine || [],
 			recipe_id: snapshot.recipe_id,
-			cook_active_min: estimateCookMin(snapshot.format),
+			cook_active_min,
 		});
 
 		// Kick off the alarm chain — schedule the next phase based on
-		// current time vs. eat_window.
-		const alarmAt = this.computeInitialAlarmAt(snapshot, initial_phase, now_ms);
+		// current time vs. eat_window. Use the adjusted cook window so the
+		// cook_window-phase alarm fires at the people-aware suggested start,
+		// not the raw slot default.
+		const adjustedSnapshot: MealSnapshot = {
+			...snapshot,
+			cook_window_start_ms: adjusted.cook_window_start_ms,
+			cook_window_end_ms: adjusted.cook_window_end_ms,
+			eat_window_start_ms: adjusted.eat_window_start_ms,
+			eat_window_end_ms: adjusted.eat_window_end_ms,
+		};
+		const alarmAt = this.computeInitialAlarmAt(adjustedSnapshot, initial_phase, now_ms);
 		if (alarmAt) {
 			await this.schedule(new Date(alarmAt), "onPhaseAlarm" as never, {
-				target_phase: this.computeNextPhaseFromInit(snapshot, initial_phase, now_ms),
+				target_phase: this.computeNextPhaseFromInit(adjustedSnapshot, initial_phase, now_ms),
 				scheduled_at_ms: alarmAt,
 			} satisfies AlarmPayload as never);
 			this.setState({ ...this.state, next_alarm_at_ms: alarmAt });
@@ -408,6 +458,7 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			eat_window_start_ms:  overrides.eat_window_start_ms ?? windows.eat_window_start_ms,
 			eat_window_end_ms:    overrides.eat_window_end_ms ?? windows.eat_window_end_ms,
 			equipment: [],
+			people: null,
 		};
 	}
 
@@ -473,6 +524,9 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			eat_window_start_ms: row.eat_window_start_ms,
 			eat_window_end_ms: row.eat_window_end_ms,
 			equipment: parseStringArray(row.equipment_json),
+			// people not stored in the per-DO meal_snapshot table yet; defer
+			// to the D1 plan record on next /init for the Track B adjustment.
+			people: null,
 		};
 	}
 

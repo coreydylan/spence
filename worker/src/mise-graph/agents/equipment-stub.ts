@@ -20,7 +20,9 @@ import type { AgentSqlSink } from "./base";
 // Phase 2 will swap meal-phase-handlers off the per-DO stub.
 export {
 	claimEquipment,
+	defaultEquipmentDefinition,
 	defineEquipment,
+	ensureEquipmentDefined,
 	findFreeWindow,
 	getEquipmentLoad,
 	listEquipment,
