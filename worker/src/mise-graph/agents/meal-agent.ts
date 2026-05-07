@@ -73,6 +73,15 @@ export interface MealAgentState {
 	cook_window_end_ms: number | null;
 	eat_window_start_ms: number | null;
 	eat_window_end_ms: number | null;
+	// Surfaced meal-shape so chef-of-staff can reason about the dish.
+	format: string | null;
+	cuisine: string[];
+	recipe_id: string | null;
+	// Heuristic estimate of active cook time in minutes, derived from format.
+	// Lets the chef-of-staff suggest a real "start cooking at X" within the
+	// cook_window range. Replace with recipe.consensus_total_time once
+	// canonical recipes get wired up.
+	cook_active_min: number | null;
 }
 
 const INITIAL_STATE: MealAgentState = {
@@ -94,7 +103,29 @@ const INITIAL_STATE: MealAgentState = {
 	cook_window_end_ms: null,
 	eat_window_start_ms: null,
 	eat_window_end_ms: null,
+	format: null,
+	cuisine: [],
+	recipe_id: null,
+	cook_active_min: null,
 };
+
+// Heuristic active-cook time in minutes by format. Used by chef-of-staff
+// to suggest real start times (cook_window_end - cook_active_min). Will be
+// superseded by recipe.consensus_total_time when canonical recipes ship.
+const FORMAT_COOK_MIN: Record<string, number> = {
+	salad: 15, sandwich: 10, taco: 25, tostada: 20, sopes: 25, banh_mi: 20,
+	bowl: 30, donburi: 35, stir_fry: 25, soup: 35, curry: 40,
+	pasta: 30, frittata: 25, pizza: 40, flatbread: 35, mezze: 60,
+	mezze_plate: 60, fritter: 30, dumpling: 50, hot_pot: 45,
+	risotto: 35, paella: 50, tagine: 70, gratin: 60, galette: 55,
+	burger: 25,
+};
+
+function estimateCookMin(format: string | null | undefined): number | null {
+	if (!format) return null;
+	const k = format.toLowerCase().trim().replace(/-/g, "_");
+	return FORMAT_COOK_MIN[k] ?? FORMAT_COOK_MIN[k.replace(/_/g, " ")] ?? 30;
+}
 
 interface InitBody {
 	meal_id?: string;
@@ -329,6 +360,10 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			cook_window_end_ms: snapshot.cook_window_end_ms,
 			eat_window_start_ms: snapshot.eat_window_start_ms,
 			eat_window_end_ms: snapshot.eat_window_end_ms,
+			format: snapshot.format,
+			cuisine: snapshot.cuisine || [],
+			recipe_id: snapshot.recipe_id,
+			cook_active_min: estimateCookMin(snapshot.format),
 		});
 
 		// Kick off the alarm chain — schedule the next phase based on
