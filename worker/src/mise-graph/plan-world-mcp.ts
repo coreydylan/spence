@@ -107,10 +107,29 @@ import {
 } from "./household-members";
 import {
 	answerOnboarding,
+	listResponses as listOnboardingResponses,
 	skipOnboarding,
 	startOnboarding,
 	statusOnboarding,
 } from "./onboarding";
+import {
+	setEquipmentBulk,
+	setPantryBulk,
+	setTraditions,
+} from "./onboarding-bulk";
+import { getTraits } from "./onboarding-traits";
+import {
+	observeFromTool,
+	observeResponse,
+	type ObservationContext,
+	type ObservedTraitDelta,
+} from "./onboarding-observe";
+import {
+	computeEngagementSignal,
+	pickQuestionForBrief,
+} from "./onboarding-scheduler";
+import { allQuestions } from "./onboarding-questions";
+import { getHouseholdTraitSpread } from "./onboarding-trait-spread";
 import {
 	getPresence,
 	listAvailableMembers,
@@ -428,6 +447,19 @@ export async function callPlanWorldTool(
 		case "household_onboarding_answer": return await toolOnboardingAnswer(args, env);
 		case "household_onboarding_skip": return await toolOnboardingSkip(args, env);
 		case "household_onboarding_status": return await toolOnboardingStatus(args, env);
+
+		// ── Onboarding (Phase B) — bulk intake + read-only trait introspect ─
+		case "household_set_pantry_bulk": return await toolSetPantryBulk(args, env);
+		case "household_set_equipment_bulk": return await toolSetEquipmentBulk(args, env);
+		case "household_set_traditions": return await toolSetTraditions(args, env);
+		case "household_get_traits": return await toolGetTraits(args, env);
+
+		// ── Onboarding (Phase C) — observation pipeline + brief scheduler ──
+		case "household_observe_response": return await toolObserveResponse(args, env);
+		case "household_get_next_question": return await toolGetNextQuestion(args, env);
+
+		// ── Onboarding (Phase D) — multi-member trait spread analyzer ──────
+		case "household_get_trait_spread": return await toolGetTraitSpread(args, env);
 
 		// ── Concept board (Wave 6) — Phase-1 inspiration sticky-notes ────
 		case "inspire_set_movement": return await toolInspireSetMovement(args, env);
@@ -789,6 +821,22 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 			household_id: updated.household_id ?? null,
 		});
 	}
+
+	// Phase C observation: log the compose so trait inference sees behavior.
+	// Best-effort, fire-and-forget — failures never break the compose flow.
+	const composedMeal = findMealAt(updated, slot.date, slot.slot);
+	const repeat_count = composedMeal ? countRecentRepeats(updated, composedMeal.title) : 0;
+	const formatStr = composedMeal?.format ?? "?";
+	const cuisineStr = (composedMeal?.cuisine || []).join(",") || "?";
+	const peopleStr = String(composedMeal?.people ?? "?");
+	await observeFromTool(env, {
+		household_id: updated.household_id ?? null,
+		plan_id: planId,
+		observation_kind: "meal_composed",
+		observation_text: `format=${formatStr} cuisine=${cuisineStr} people=${peopleStr}`,
+		context: { repeat_count },
+	});
+
 	return {
 		plan_id: planId,
 		ok: true,
@@ -803,6 +851,7 @@ async function toolCancelMeal(args: Record<string, unknown>, env: MiseGraphEnv):
 	const planId = requireString(args.plan_id, "plan_id");
 	const slot = requireSlotFromArgs(args);
 	const reason = optionalString(args.reason) ?? "manual_cancel";
+	const within2h = typeof args.within_cook_window_2h === "boolean" ? args.within_cook_window_2h : undefined;
 	const result = await applyMutation(env, args, plan => previewCancelMeal(plan, slot));
 	// Wave 7B Phase 2: signal the MealAgent so it can release equipment claims
 	// and write a phase_transition row. Best-effort; D1 is authoritative.
@@ -813,6 +862,13 @@ async function toolCancelMeal(args: Record<string, unknown>, env: MiseGraphEnv):
 			slot: slot.slot,
 			reason,
 		});
+		// Phase C observation: cancellation is evidence of time pressure.
+		await observeFromTool(env, {
+			plan_id: planId,
+			observation_kind: "meal_cancelled",
+			observation_text: reason,
+			context: within2h !== undefined ? { cancel_within_2h: within2h } : undefined,
+		});
 	}
 	return result;
 }
@@ -821,7 +877,17 @@ async function toolSwapIngredient(args: Record<string, unknown>, env: MiseGraphE
 	const slot = requireSlotFromArgs(args);
 	const fromName = requireString(args.from_name, "from_name");
 	const toName = requireString(args.to_name, "to_name");
-	return await applyMutation(env, args, plan => previewSwapIngredient(plan, slot, fromName, toName));
+	const planId = optionalString(args.plan_id);
+	const result = await applyMutation(env, args, plan => previewSwapIngredient(plan, slot, fromName, toName));
+	// Phase C observation: ingredient swap = improvisation evidence.
+	if (result.ok !== false) {
+		await observeFromTool(env, {
+			plan_id: planId ?? null,
+			observation_kind: "ingredient_swap",
+			observation_text: `${fromName}→${toName}`,
+		});
+	}
+	return result;
 }
 
 async function toolMoveMeal(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
@@ -841,10 +907,21 @@ async function toolReplaceMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 	if (!newMeal) {
 		throw new Error("plan_replace_meal requires either `new_meal` or `meal` (a meal object). Got neither.");
 	}
-	return await applyMutation(env, args, plan => previewReplaceMeal(plan, slot, newMeal, {
+	const planId = optionalString(args.plan_id);
+	const result = await applyMutation(env, args, plan => previewReplaceMeal(plan, slot, newMeal, {
 		must_consume: stringArray(args.must_consume),
 		must_avoid: stringArray(args.must_avoid),
 	}));
+	// Phase C observation: replace = mild dissatisfaction signal (logged only).
+	if (result.ok !== false) {
+		const newTitle = typeof newMeal.title === "string" ? newMeal.title : "(meal)";
+		await observeFromTool(env, {
+			plan_id: planId ?? null,
+			observation_kind: "meal_replaced",
+			observation_text: `${slot.date}/${slot.slot} → ${newTitle}`,
+		});
+	}
+	return result;
 }
 
 async function toolSplitBatch(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
@@ -1734,6 +1811,36 @@ function findMealId(plan: MiseWeeklyPlanDraft, date: string, slotName: MiseMealS
 	return null;
 }
 
+// Look up the meal object (not just the id) at a given slot. Used by the
+// Phase C observation hook on plan_compose_meal to extract format/cuisine
+// for the synthetic response_text.
+function findMealAt(plan: MiseWeeklyPlanDraft, date: string, slotName: MiseMealSlot): MisePlanMeal | null {
+	if (slotName === "breakfast") {
+		const b = (plan.breakfasts || []).find(b => b.date === date);
+		if (b) return b;
+	}
+	for (const day of plan.meals_by_day || []) {
+		if (day.date !== date) continue;
+		const meal = day.meals.find(m => normalizeSlot(m.slot) === slotName);
+		if (meal) return meal;
+	}
+	return null;
+}
+
+// Count how many times `title` already appears in the plan (other than the
+// just-composed meal). Phase C uses this to bump comfort_vs_adventure ↓
+// when the same recipe shows up 3+ times.
+function countRecentRepeats(plan: MiseWeeklyPlanDraft, title: string): number {
+	if (!title) return 0;
+	const norm = title.trim().toLowerCase();
+	let count = 0;
+	for (const meal of collectAllMeals(plan)) {
+		if (typeof meal.title !== "string") continue;
+		if (meal.title.trim().toLowerCase() === norm) count++;
+	}
+	return count;
+}
+
 function collectAllMeals(plan: MiseWeeklyPlanDraft): MisePlanMeal[] {
 	const out: MisePlanMeal[] = [];
 	for (const day of plan.meals_by_day || []) for (const meal of day.meals) out.push(meal);
@@ -2069,6 +2176,150 @@ async function toolOnboardingStatus(args: Record<string, unknown>, env: MiseGrap
 	const household_id = requireString(args.household_id, "household_id");
 	const result = await statusOnboarding(env, { household_id });
 	return result as unknown as Record<string, unknown>;
+}
+
+// ─── Onboarding Phase B — bulk intake + traits ────────────────────────────
+
+async function toolSetPantryBulk(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const modeRaw = optionalString(args.mode);
+	const mode: "text" | "photo" | undefined = modeRaw === "photo" ? "photo" : modeRaw === "text" ? "text" : undefined;
+	const text = optionalString(args.text);
+	const image_b64 = optionalString(args.image_b64);
+	const image_mime = optionalString(args.image_mime);
+	const replace_existing = typeof args.replace_existing === "boolean" ? args.replace_existing : undefined;
+	const result = await setPantryBulk(env, {
+		household_id,
+		mode,
+		text,
+		image_b64,
+		image_mime,
+		replace_existing,
+	});
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolSetEquipmentBulk(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const slugs = stringArray(args.equipment_slugs) ?? [];
+	const result = await setEquipmentBulk(env, { household_id, equipment_slugs: slugs });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolSetTraditions(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const traditionsRaw = Array.isArray(args.traditions) ? args.traditions : [];
+	const traditions = traditionsRaw
+		.filter((t): t is Record<string, unknown> => isRecord(t))
+		.map(t => ({
+			name: requireString(t.name, "tradition.name"),
+			cadence: requireString(t.cadence, "tradition.cadence"),
+			description: optionalString(t.description),
+			must_include_ingredients: stringArray(t.must_include_ingredients),
+			must_include_format: optionalString(t.must_include_format),
+			origin_note: optionalString(t.origin_note),
+		}));
+	const result = await setTraditions(env, { household_id, traditions });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolGetTraits(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const with_descriptions = typeof args.with_descriptions === "boolean" ? args.with_descriptions : false;
+	const result = await getTraits(env, { household_id, with_descriptions });
+	return result as unknown as Record<string, unknown>;
+}
+
+// ─── Onboarding Phase C — observation pipeline + brief scheduler ───────────
+
+async function toolObserveResponse(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const observation_kind = requireString(args.observation_kind, "observation_kind");
+	const observation_text = optionalString(args.observation_text) ?? "";
+	const member_id = optionalString(args.member_id);
+	const inferred_traits = parseObservedTraitDeltas(args.inferred_traits);
+	const context = isRecord(args.context) ? args.context as ObservationContext : undefined;
+	const result = await observeResponse(env, {
+		household_id,
+		observation_kind,
+		observation_text,
+		member_id,
+		inferred_traits,
+		context,
+	});
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolGetNextQuestion(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const status = await statusOnboarding(env, { household_id });
+	const recent = await listOnboardingResponses(env, household_id);
+	const now = Date.now();
+	const engagement = computeEngagementSignal(recent, now);
+	const picked = pickQuestionForBrief({
+		state: status.state,
+		recent_responses: recent,
+		available_questions: allQuestions(),
+		now_ms: now,
+		engagement_signal: engagement,
+	});
+	return {
+		household_id,
+		engagement_signal: round3(engagement),
+		picked: picked
+			? {
+				question_kind: picked.question.kind,
+				tier: picked.question.tier,
+				required: picked.question.required,
+				question_text: picked.question.question_text,
+				options: picked.question.options ? picked.question.options.map(o => ({ ...o })) : undefined,
+				score: picked.score,
+				reason: picked.reason,
+			}
+			: null,
+	};
+}
+
+// ─── Onboarding Phase D — multi-member trait spread ───────────────────────
+
+async function toolGetTraitSpread(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const spreads = await getHouseholdTraitSpread(env, household_id);
+	return {
+		household_id,
+		spreads: spreads.map(s => ({
+			trait_name: s.trait_name,
+			household_value: s.household_value,
+			household_confidence: s.household_confidence,
+			member_values: s.member_values.map(m => ({ ...m })),
+			divergence: s.divergence,
+			status: s.status,
+			description: s.description,
+		})),
+	};
+}
+
+function parseObservedTraitDeltas(raw: unknown): ObservedTraitDelta[] | undefined {
+	if (!Array.isArray(raw) || raw.length === 0) return undefined;
+	const out: ObservedTraitDelta[] = [];
+	for (const item of raw) {
+		if (!isRecord(item)) continue;
+		const trait_name = optionalString(item.trait_name);
+		const delta_value = optionalNumber(item.delta_value);
+		const delta_confidence = optionalNumber(item.delta_confidence);
+		if (!trait_name || delta_value === undefined || delta_confidence === undefined) continue;
+		out.push({
+			trait_name: trait_name as ObservedTraitDelta["trait_name"],
+			delta_value,
+			delta_confidence,
+		});
+	}
+	return out.length > 0 ? out : undefined;
+}
+
+function round3(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	return Math.round(value * 1000) / 1000;
 }
 
 // ─── Conversion + validation helpers ───────────────────────────────────────
@@ -3283,6 +3534,101 @@ const PLAN_WORLD_TOOLS = [
 		},
 	}),
 	tool("household_onboarding_status", "Read-only snapshot: current state, all 7 traits with confidence, next-question preview, completion_pct (tiers complete / 5), and engagement_signal.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+		},
+	}),
+
+	// ── Onboarding (Phase B) — bulk intake + read-only trait introspect ────
+	tool("household_set_pantry_bulk", "One-shot pantry intake. mode='text' parses a free-text list (newline/comma separated) and auto-categorizes each item; mode='photo' calls bridge-vision over image_b64 and parses the visible food items. Writes mise_kitchen_inventory rows (source='bulk_intake') plus a synthetic onboarding_response so the trait engine sees pantry-rich vs pantry-bare evidence. replace_existing soft-deletes prior un-consumed inventory before inserting.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+			mode: { type: "string", enum: ["text", "photo"], description: "Default 'text'." },
+			text: { type: "string", description: "Free-text list. Newlines OR commas separate items. Bullet/dash prefixes and trailing parentheticals are stripped." },
+			image_b64: { type: "string", description: "Base64-encoded image bytes (for mode='photo'). data: URI prefix accepted." },
+			image_mime: { type: "string", description: "Default 'image/jpeg'. Pass 'image/png' or 'image/webp' if applicable." },
+			replace_existing: { type: "boolean", description: "If true, soft-delete all current un-consumed inventory before inserting." },
+		},
+	}),
+	tool("household_set_equipment_bulk", "One-shot equipment intake. Each slug runs through ensureEquipmentDefined() — already-defined slugs are reported in already_defined; new slugs land in mise_equipment_definitions with sensible defaults. Equipment count drives equipment_rich_vs_minimalist trait deltas (>=15 → rich, <=4 → minimalist).", {
+		type: "object",
+		required: ["household_id", "equipment_slugs"],
+		properties: {
+			household_id: { type: "string" },
+			equipment_slugs: { type: "array", items: { type: "string" }, description: "Equipment slugs (e.g. 'oven', 'instant_pot', 'chefs_knife'). Duplicates deduped case-insensitively." },
+		},
+	}),
+	tool("household_set_traditions", "Add or replace standing meals (Friday pizza night, Sunday roast, etc.). cadence formats: 'weekly:friday' | 'monthly:1st-saturday' | 'seasonal:fall' | 'annual:thanksgiving'. A tradition with the same (household_id, name) is replaced.", {
+		type: "object",
+		required: ["household_id", "traditions"],
+		properties: {
+			household_id: { type: "string" },
+			traditions: {
+				type: "array",
+				items: {
+					type: "object",
+					required: ["name", "cadence"],
+					properties: {
+						name: { type: "string" },
+						cadence: { type: "string" },
+						description: { type: "string" },
+						must_include_ingredients: { type: "array", items: { type: "string" } },
+						must_include_format: { type: "string" },
+						origin_note: { type: "string" },
+					},
+				},
+			},
+		},
+	}),
+	tool("household_get_traits", "Read-only fetch of the 7 personality dimensions with value (0..1), confidence, evidence_count, last_evidence_at_ms. With with_descriptions=true each row is enriched with a human-readable summary explaining what the value means (and a 'preliminary signal' prefix when confidence < 0.3).", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+			with_descriptions: { type: "boolean", description: "Default false. Include human-readable description per trait." },
+		},
+	}),
+
+	// ── Onboarding (Phase C) — observation pipeline + brief scheduler ─────
+	tool("household_observe_response", "Write a synthetic onboarding response from a behavioral observation (compose, cancel, swap, mark-eaten, etc.). The agent calls this from inside other tools when it overhears a fact; the response feeds trait inference exactly like a user-answered question. observation_kind is the event name (without the `_observed:` prefix); inferred_traits can override the rule table for cases the agent already classified.", {
+		type: "object",
+		required: ["household_id", "observation_kind", "observation_text"],
+		properties: {
+			household_id: { type: "string" },
+			observation_kind: { type: "string", description: "Event kind, e.g. meal_composed, meal_cancelled, ingredient_swap, meal_eaten, meal_replaced, brigade_mode_used, pantry_utilization_high." },
+			observation_text: { type: "string", description: "Free-text summary of the observation; stored as response_text and indexed alongside user answers." },
+			member_id: { type: "string", description: "Optional — when the observation is attributable to a specific household member." },
+			inferred_traits: {
+				type: "array",
+				description: "Optional explicit trait deltas. If omitted, the rule table derives them from observation_kind + context.",
+				items: {
+					type: "object",
+					required: ["trait_name", "delta_value", "delta_confidence"],
+					properties: {
+						trait_name: { type: "string", description: "One of the 7 dimensions (e.g. quick_vs_project)." },
+						delta_value: { type: "number", description: "Target value 0..1 to nudge the trait toward." },
+						delta_confidence: { type: "number", description: "Evidence weight for this single observation (typical: 0.05–0.3)." },
+					},
+				},
+			},
+			context: {
+				type: "object",
+				description: "Optional context for rule firing (cancel_within_2h, repeat_count, pantry_utilization).",
+			},
+		},
+	}),
+	tool("household_get_next_question", "Read-only preview of which onboarding question (if any) the daily scheduler would surface in tomorrow's morning brief. Computes engagement_signal from response history, scores every available question (tier × novelty × kind_priority × engagement), and returns the top scorer or null when nothing exceeds the threshold. Does NOT update last_question_asked_at — that side-effect happens only when the brief actually fires.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+		},
+	}),
+	tool("household_get_trait_spread", "Read-only multi-member trait spread analysis (Phase D). For each of the 7 personality dimensions tracked in mise_household_traits, returns household_value (mean across members or household-level), member_values (per-member readings when available), divergence (max-min across members; 0..1), status ('aligned' | 'diverging' | 'uncalibrated'), and a human-readable description suitable for compose-time prompts (e.g. 'Corey leans comfort, Katrina leans adventure — alternate or split the dishes').", {
 		type: "object",
 		required: ["household_id"],
 		properties: {

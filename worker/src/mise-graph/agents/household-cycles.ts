@@ -12,6 +12,9 @@ import { fetchWeatherForecast, type WeatherSummary } from "../weather-tools";
 import { runHardCritics, runWarningCritics } from "../critics";
 import type { MisePlanTask, MiseWeeklyPlanDraft } from "../planner";
 import { generateAgentId } from "./base";
+import { listResponses, statusOnboarding, type OnboardingState } from "../onboarding";
+import { allQuestions } from "../onboarding-questions";
+import { computeEngagementSignal, pickQuestionForBrief, type ScheduledQuestion } from "../onboarding-scheduler";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +32,17 @@ export interface DailyBriefSuggestion {
 	plan_id?: string;
 }
 
+export interface MorningBriefOnboardingQuestion {
+	kind: string;
+	tier: number;
+	required: boolean;
+	text: string;
+	options?: Array<{ value: string; label: string }>;
+	score: number;
+	reason: string;
+	engagement_signal: number;
+}
+
 export interface MorningBriefResult {
 	id: string;
 	household_id: string;
@@ -37,6 +51,7 @@ export interface MorningBriefResult {
 	calendar: CalendarWindow[];
 	plan_health: PlanHealthSnapshot[];
 	suggestions: DailyBriefSuggestion[];
+	onboarding_question?: MorningBriefOnboardingQuestion | null;
 	created_at_ms: number;
 }
 
@@ -217,6 +232,12 @@ export async function computeMorningBrief(
 
 	const suggestions = buildSuggestions(plan_health, calendar, for_date);
 
+	// Phase C: pick today's onboarding question (if any) and bump the
+	// last_question_asked_at counter. Best-effort — onboarding tables may
+	// not exist if the migration hasn't been run; in that case we silently
+	// skip and the brief still ships.
+	const onboarding_question = await pickAndStampDailyQuestion(env, household_id, now.getTime());
+
 	return {
 		id: generateAgentId("brief"),
 		household_id,
@@ -225,7 +246,86 @@ export async function computeMorningBrief(
 		calendar,
 		plan_health,
 		suggestions,
+		onboarding_question,
 		created_at_ms: now.getTime(),
+	};
+}
+
+/**
+ * Pull the onboarding state, pick the highest-scoring question for the
+ * brief, and stamp last_question_asked_at + questions_asked_count when one
+ * is selected. Returns the question payload for the brief, or null if the
+ * scheduler decided to stay silent.
+ *
+ * Wrapped in try/catch — any onboarding-table failure (migration not run,
+ * D1 hiccup) returns null without breaking the brief.
+ */
+export async function pickAndStampDailyQuestion(
+	env: MiseGraphEnv,
+	household_id: string,
+	now_ms: number,
+): Promise<MorningBriefOnboardingQuestion | null> {
+	let state: OnboardingState | null = null;
+	try {
+		const status = await statusOnboarding(env, { household_id });
+		state = status.state;
+	} catch {
+		return null;
+	}
+	if (!state) return null;
+	// Past tier 4 → no more onboarding questions to surface.
+	if (state.current_tier > 4) return null;
+
+	let recent: Awaited<ReturnType<typeof listResponses>> = [];
+	try {
+		recent = await listResponses(env, household_id);
+	} catch {
+		recent = [];
+	}
+
+	const engagement_signal = computeEngagementSignal(recent, now_ms);
+
+	const picked: ScheduledQuestion | null = pickQuestionForBrief({
+		state,
+		recent_responses: recent,
+		available_questions: allQuestions(),
+		now_ms,
+		engagement_signal,
+	});
+	if (!picked) return null;
+
+	// Stamp last_asked + bump asked count. We do a read-then-write rather
+	// than a column-arithmetic UPDATE because the in-memory mock-D1 only
+	// supports `column = ?` assignments. Real D1 supports both.
+	try {
+		const newAskedCount = (state.questions_asked_count || 0) + 1;
+		await env.DB.prepare(
+			`UPDATE mise_onboarding_state
+			   SET last_question_asked_at = ?,
+			       questions_asked_count = ?,
+			       engagement_signal = ?,
+			       updated_at_ms = ?
+			 WHERE household_id = ?`,
+		).bind(
+			new Date(now_ms).toISOString(),
+			newAskedCount,
+			engagement_signal,
+			now_ms,
+			household_id,
+		).run();
+	} catch {
+		// Schema missing — let the brief surface anyway.
+	}
+
+	return {
+		kind: picked.question.kind,
+		tier: picked.question.tier,
+		required: picked.question.required,
+		text: picked.question.question_text,
+		options: picked.question.options ? picked.question.options.map(o => ({ ...o })) : undefined,
+		score: picked.score,
+		reason: picked.reason,
+		engagement_signal,
 	};
 }
 
