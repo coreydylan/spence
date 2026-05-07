@@ -1,5 +1,6 @@
 import { handleMiseGraphRequest } from "./mise-graph";
 import { handlePlanWorldMcpRequest } from "./mise-graph/plan-world-mcp";
+import { handleAgentChefRoute } from "./mise-graph/agent-chef-route";
 import { handleReplanRequest, handleReplanLogRequest } from "./mise-graph/replan-webhook";
 import { migrateHouseholdMemorySchema } from "./mise-graph/admin-household-memory";
 import { migrateCalendarSchema } from "./mise-graph/calendar-tools";
@@ -78,12 +79,20 @@ export interface Env extends MiseGraphEnv {
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
+		const url = new URL(request.url);
+		const path = url.pathname === "/" ? "/mise-graph" : url.pathname;
+
+		// Chef-of-staff agent route — runs the agent loop on the worker and
+		// streams SSE back. Handles its own OPTIONS preflight (per-route CORS
+		// because the web app is on a different origin and we need fine-
+		// grained allow-origin/headers for credentialed reqs).
+		if (path === "/agent/chef") {
+			return await handleAgentChefRoute(request, env);
+		}
+
 		if (request.method === "OPTIONS") {
 			return new Response(null, { status: 204, headers: CORS_HEADERS });
 		}
-
-		const url = new URL(request.url);
-		const path = url.pathname === "/" ? "/mise-graph" : url.pathname;
 
 		// MCP plan-world tool server (Wave 5A)
 		const mcpResponse = await handlePlanWorldMcpRequest(path, request, env);

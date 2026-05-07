@@ -302,6 +302,9 @@ function applyEvent(message: Message, event: ChefEvent): Message {
       return { ...message, text: message.text + `\n\n_${event.error}_`, done: true };
     case "status":
       return message;
+    case "thinking_start":
+      // Worker pre-bridge marker; chat surface no-ops for now.
+      return message;
   }
 }
 
