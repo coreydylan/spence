@@ -204,7 +204,7 @@ function renderGrievances(lines: string[], grievances: Grievance[]): void {
 	lines.push("");
 	for (const severity of SEVERITY_ORDER) {
 		const group = grievances.filter(g => g.severity === severity);
-		lines.push(`### ${titleCase(severity)} (${group.length})`);
+		lines.push(`### ${severityHeading(severity)} (${group.length})`);
 		if (group.length === 0) {
 			lines.push("- none");
 			lines.push("");
@@ -553,6 +553,13 @@ function trimNumber(value: number): string {
 
 function titleCase(value: string): string {
 	return value.replace(/\b[a-z]/g, char => char.toUpperCase());
+}
+
+function severityHeading(severity: GrievanceSeverity): string {
+	// Hard/Warning render as the singular tier name; Preferences renders in
+	// the plural to read naturally as a section header ("### Preferences (3)").
+	if (severity === "preference") return "Preferences";
+	return titleCase(severity);
 }
 
 function clean(value: unknown): string {

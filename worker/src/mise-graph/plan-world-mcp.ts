@@ -51,6 +51,7 @@ import {
 	type RipplePreview,
 } from "./ripple-preview";
 import { runHardCritics, runWarningCritics, type Grievance, type GrievanceSeverity } from "./critics";
+import { loadHouseholdContextForAudit, runHouseholdAwareCritics } from "./household-critics";
 import { ledgerFromPlan } from "./resource-ledger";
 import { deriveDependencyEdges, edgesViolated, type DependencyEdge } from "./dependency-edges";
 import { isMealLocked, lockMeal, unlockMeal } from "./locks";
@@ -131,6 +132,10 @@ import {
 } from "./onboarding-scheduler";
 import { allQuestions } from "./onboarding-questions";
 import { getHouseholdTraitSpread } from "./onboarding-trait-spread";
+import {
+	chefDispatch,
+	chefStatusCheck,
+} from "./chef-dispatch";
 import {
 	getPresence,
 	listAvailableMembers,
@@ -468,6 +473,10 @@ export async function callPlanWorldTool(
 		// ── Onboarding (Phase D) — multi-member trait spread analyzer ──────
 		case "household_get_trait_spread": return await toolGetTraitSpread(args, env);
 
+		// ── Chef-of-staff dispatch — onboarding-aware turn router ─────────
+		case "chef_status_check": return await toolChefStatusCheck(args, env);
+		case "chef_dispatch": return await toolChefDispatch(args, env);
+
 		// ── Wave 7F — read today's morning brief (cron output) ─────────────
 		case "household_read_brief": return await toolReadBrief(args, env);
 
@@ -804,6 +813,11 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 		};
 	}
 
+	// Soft tier-0 warning — DO NOT block, just annotate the result so the
+	// chef-of-staff agent can see "you composed without onboarding context".
+	// Best-effort: if the onboarding state table isn't migrated, skip the check.
+	const onboardingNotes = await checkOnboardingForCompose(env, plan.household_id ?? null);
+
 	const beforeGrievances = safeRunCritics(plan);
 	const beforeIds = new Set(beforeGrievances.map(grievanceKey));
 
@@ -851,7 +865,7 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 		member_id: composeMemberId,
 	});
 
-	return {
+	const result: Record<string, unknown> = {
 		plan_id: planId,
 		ok: true,
 		meal_id,
@@ -859,6 +873,40 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 		resolved_grievances: resolvedGrievances,
 		summary: planReadSummary(world),
 	};
+	if (onboardingNotes.length > 0) {
+		result.notes = onboardingNotes;
+	}
+	return result;
+}
+
+/**
+ * Soft check on onboarding state at compose-time. Returns a list of
+ * `notes` strings to attach to the compose result. Empty when tier_0 is
+ * complete OR when the household_id isn't known (legacy plans without a
+ * household). Never throws — failures degrade to "no notes".
+ */
+async function checkOnboardingForCompose(
+	env: MiseGraphEnv,
+	household_id: string | null,
+): Promise<string[]> {
+	if (!household_id) return [];
+	try {
+		const row = await env.DB.prepare(
+			`SELECT current_tier, tier_0_completed_at
+			 FROM mise_onboarding_state
+			 WHERE household_id = ?`,
+		).bind(household_id).first<{ current_tier: number; tier_0_completed_at: string | null }>();
+		if (!row) {
+			return ["onboarding_incomplete: no onboarding state — meal composed without personality context"];
+		}
+		if (!row.tier_0_completed_at) {
+			return ["onboarding_incomplete: tier 0 questions not answered — meal composed without personality context"];
+		}
+		return [];
+	} catch {
+		// Table missing — onboarding migration hasn't run on this DB. Silent.
+		return [];
+	}
 }
 
 async function toolCancelMeal(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
@@ -1317,8 +1365,26 @@ async function toolAudit(args: Record<string, unknown>, env: MiseGraphEnv): Prom
 	const grievances: Grievance[] = [];
 	if (which === "hard" || which === "all") grievances.push(...safeRunHard(world.plan));
 	if (which === "warning" || which === "all") grievances.push(...safeRunWarning(world.plan));
+
+	// Household-aware preference critics: only run when the plan has an
+	// associated household_id and the caller asked for "all" (or the new
+	// "preference" explicit selector). Failures are swallowed — these critics
+	// are advisory and must not break audits.
+	let signals: Record<string, unknown> | null = null;
+	if (which === "all" || which === "preference") {
+		try {
+			const context = await loadHouseholdContextForAudit(env, world.plan);
+			if (context) {
+				grievances.push(...runHouseholdAwareCritics(world.plan, context));
+				signals = context.signals as unknown as Record<string, unknown>;
+			}
+		} catch {
+			// best-effort — household-aware critics never block.
+		}
+	}
+
 	const counts = countBySeverity(grievances);
-	return { plan_id: world.plan.id, run_critics: which, counts, grievances };
+	return { plan_id: world.plan.id, run_critics: which, counts, grievances, signals };
 }
 
 // ─── Weather + calendar (Wave 6) ───────────────────────────────────────────
@@ -2324,6 +2390,21 @@ async function toolGetTraitSpread(args: Record<string, unknown>, env: MiseGraphE
 			description: s.description,
 		})),
 	};
+}
+
+// ─── Chef-of-staff dispatch ────────────────────────────────────────────────
+
+async function toolChefStatusCheck(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const result = await chefStatusCheck(env, { household_id });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolChefDispatch(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const user_intent = optionalString(args.user_intent) ?? "";
+	const result = await chefDispatch(env, { household_id, user_intent });
+	return result as unknown as Record<string, unknown>;
 }
 
 // ─── Wave 7F — read today's morning brief ─────────────────────────────────
@@ -3734,7 +3815,22 @@ const PLAN_WORLD_TOOLS = [
 			household_id: { type: "string" },
 		},
 	}),
-	tool("household_read_brief", "Read the morning brief for a household + date (defaults to today UTC). Returns the persisted brief from mise_household_agent_briefs including weather, calendar windows, plan health snapshots, suggestions, and the onboarding question (if one was surfaced). Returns { ok: false, reason: 'no_brief' } when the cron sweep hasn't generated a brief yet — and surfaces `latest` as a hint to the caller when querying today.", {
+	tool("chef_status_check", "The chef-of-staff agent calls this FIRST every turn. Returns onboarding tier state, the next onboarding question (if any), `blocked_actions` listing tools the agent must NOT call yet (only populated when tier 0 is incomplete), and a `recommendation` block telling the agent what to do (`answer_onboarding_question` | `compose_meal` | `compose_with_inline_question` | `ready_to_plan`) plus a HouseholdSignals bundle once tier 1 is complete. Fast — no slow D1 scans.", {
+			type: "object",
+			required: ["household_id"],
+			properties: {
+				household_id: { type: "string" },
+			},
+		}),
+		tool("chef_dispatch", "Higher-level helper that calls chef_status_check itself, then constructs a 1-action `turn_plan` based on the recommendation. Each action has {kind: 'ask_question' | 'ask_user' | 'compose_meal', args, rationale}. Phase 1 stub — real intent parsing comes later, but the agent can rely on the turn_plan as a baseline.", {
+			type: "object",
+			required: ["household_id"],
+			properties: {
+				household_id: { type: "string" },
+				user_intent: { type: "string", description: "Free-text user message (e.g. 'plan me dinners this week'). Not parsed yet — passed through for future intent matching." },
+			},
+		}),
+		tool("household_read_brief", "Read the morning brief for a household + date (defaults to today UTC). Returns the persisted brief from mise_household_agent_briefs including weather, calendar windows, plan health snapshots, suggestions, and the onboarding question (if one was surfaced). Returns { ok: false, reason: 'no_brief' } when the cron sweep hasn't generated a brief yet — and surfaces `latest` as a hint to the caller when querying today.", {
 		type: "object",
 		required: ["household_id"],
 		properties: {

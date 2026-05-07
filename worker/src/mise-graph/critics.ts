@@ -863,6 +863,13 @@ export function runWarningCritics(plan: MiseWeeklyPlanDraft, options: CriticAudi
 	return out;
 }
 
+// Re-export the household-aware aggregator so callers can wire one import
+// path. The household critics live in their own module to keep this file
+// dependency-light (and to avoid a circular import — household-critics
+// imports `Grievance`/`SlotRef` types from here).
+export { runHouseholdAwareCritics, loadHouseholdContextForAudit } from "./household-critics";
+export type { HouseholdAuditContext, TraditionWithMeta } from "./household-critics";
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
