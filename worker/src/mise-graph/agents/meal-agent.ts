@@ -369,11 +369,14 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 				// Best effort — leave empty if the lookup fails.
 			}
 		}
-		// Track B people fallback chain: explicit adult_member_ids > meal.people
-		// from the snapshot > null (no adjustment).
-		const people = adultIds.length > 0
-			? adultIds.length
-			: (typeof snapshot.people === "number" && snapshot.people > 0 ? snapshot.people : null);
+		// Track B people priority: meal.people (actual headcount on the
+		// snapshot — includes guests) > adult_member_ids.length (just the
+		// household roster) > null. Guests dining matters more than how
+		// many adults live in the house.
+		const mealPeople = typeof snapshot.people === "number" && snapshot.people > 0 ? snapshot.people : null;
+		const people = mealPeople !== null
+			? mealPeople
+			: (adultIds.length > 0 ? adultIds.length : null);
 		const cook_active_min = estimateCookMin(snapshot.format);
 		const adjusted = adjustWindowsForPeopleAndCook(
 			{
