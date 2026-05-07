@@ -1,0 +1,24 @@
+{
+  "name": "recipe-graph-worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsx test/runner.ts",
+    "test:live": "tsx test/runner.ts --tier=live",
+    "test:only": "tsx test/runner.ts --only"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260404.1",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.2",
+    "wrangler": "^4.80.0"
+  },
+  "dependencies": {
+    "agents": "^0.12.3"
+  }
+}

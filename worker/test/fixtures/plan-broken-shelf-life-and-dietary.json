@@ -1,0 +1,130 @@
+{
+  "_description": "Hand-crafted plan with deliberate violations for Test 2. Three hard grievances expected: ShelfLifeCritic on Sat dinner (cooked_chickpea past use_by), DietaryCritic on Sun dinner (fish sauce in vegetarian household), LeftoverGraphCritic on Mon dinner (claims Tue lunch but Tue lunch not in plan).",
+  "id": "fixture_plan_broken",
+  "household_id": "corey",
+  "start_date": "2026-05-11",
+  "end_date": "2026-05-17",
+  "people": 2,
+  "dietary": ["vegetarian"],
+  "meals_by_day": [
+    {
+      "date": "2026-05-11",
+      "meals": [
+        {
+          "id": "meal:mon_dinner",
+          "date": "2026-05-11",
+          "slot": "dinner",
+          "title": "Test Dinner Mon (control — leftovers_to claims missing slot)",
+          "format": "skillet",
+          "people": 2,
+          "cuisine": ["Mediterranean"],
+          "component_ids": [],
+          "ingredient_names": ["egg", "swiss chard"],
+          "raw_ingredients": [{"name": "egg", "qty": 4, "unit": "whole", "grams": 200}],
+          "leftovers_to": ["2026-05-12 lunch"]
+        }
+      ]
+    },
+    {
+      "date": "2026-05-13",
+      "meals": [
+        {
+          "id": "meal:wed_control",
+          "date": "2026-05-13",
+          "slot": "dinner",
+          "title": "Test Dinner Wed (control — uses chickpea batch within shelf)",
+          "format": "bowl",
+          "people": 2,
+          "cuisine": ["Mediterranean"],
+          "component_ids": ["mise_component:cooked_chickpea"],
+          "ingredient_names": ["cooked chickpea", "tahini"],
+          "raw_ingredients": [{"name": "lemon", "qty": 0.5, "unit": "whole", "grams": 33}],
+          "leftovers_to": []
+        }
+      ]
+    },
+    {
+      "date": "2026-05-16",
+      "meals": [
+        {
+          "id": "meal:sat_violator",
+          "date": "2026-05-16",
+          "slot": "dinner",
+          "title": "Test Dinner Sat (VIOLATION — uses chickpea batch past use-by)",
+          "format": "tagine",
+          "people": 2,
+          "cuisine": ["North African"],
+          "component_ids": ["mise_component:cooked_chickpea"],
+          "ingredient_names": ["cooked chickpea", "harissa"],
+          "raw_ingredients": [{"name": "eggplant", "qty": 300, "unit": "g", "grams": 300}],
+          "leftovers_to": []
+        }
+      ]
+    },
+    {
+      "date": "2026-05-17",
+      "meals": [
+        {
+          "id": "meal:sun_violator",
+          "date": "2026-05-17",
+          "slot": "dinner",
+          "title": "Test Dinner Sun (VIOLATION — fish sauce in vegetarian)",
+          "format": "noodle",
+          "people": 2,
+          "cuisine": ["Thai"],
+          "component_ids": [],
+          "ingredient_names": ["rice noodle", "tofu"],
+          "raw_ingredients": [
+            {"name": "rice noodle", "qty": 200, "unit": "g", "grams": 200},
+            {"name": "fish sauce", "qty": 2, "unit": "tbsp", "grams": 30},
+            {"name": "tofu", "qty": 250, "unit": "g", "grams": 250}
+          ],
+          "leftovers_to": []
+        }
+      ]
+    }
+  ],
+  "breakfasts": [],
+  "snack_boxes": [],
+  "component_batches": [
+    {
+      "id": "mise_component:cooked_chickpea",
+      "label": "Cooked Whole Chickpeas",
+      "quantity": 600,
+      "unit": "g",
+      "storage": "refrigerator",
+      "container": null,
+      "quality_window_hours": 96,
+      "planned_uses": [
+        {"date": "2026-05-13", "slot": "dinner", "meal_id": "meal:wed_control", "title": "Wed control"},
+        {"date": "2026-05-16", "slot": "dinner", "meal_id": "meal:sat_violator", "title": "Sat violator"}
+      ],
+      "station_tags": ["legume_batch_active"],
+      "equipment": ["instant pot"],
+      "active_time_min": 10,
+      "idle_time_min": 60,
+      "input_names": ["chickpea", "water", "salt"],
+      "meta": { "source": "fixture", "desired_prep_date": "2026-05-11" }
+    }
+  ],
+  "_expected_grievances": [
+    {
+      "critic": "ShelfLifeCritic",
+      "severity": "hard",
+      "slot_ref": {"date": "2026-05-16", "slot": "dinner"},
+      "must_mention": ["cooked", "chickpea", "use_by"]
+    },
+    {
+      "critic": "DietaryCritic",
+      "severity": "hard",
+      "slot_ref": {"date": "2026-05-17", "slot": "dinner"},
+      "must_mention": ["fish sauce"]
+    },
+    {
+      "critic": "LeftoverGraphCritic",
+      "severity": "hard",
+      "slot_ref": {"date": "2026-05-11", "slot": "dinner"},
+      "must_mention": ["lunch", "not in plan"]
+    }
+  ]
+}

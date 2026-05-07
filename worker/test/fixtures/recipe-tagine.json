@@ -1,0 +1,29 @@
+{
+  "id": "recipe_tagine_test",
+  "title": "Lamb tagine with apricots",
+  "servings": 4,
+  "active_time_min": 45,
+  "total_time_min": 120,
+  "ingredients": [
+    "lamb shoulder",
+    "onion",
+    "garlic",
+    "ginger",
+    "apricot",
+    "olive oil",
+    "tomato",
+    "couscous",
+    "cilantro",
+    "almond"
+  ],
+  "steps": [
+    "Preheat oven to 325F.",
+    "Dice the onion and mince the garlic and ginger on the cutting board.",
+    "Brown the lamb shoulder in olive oil in a heavy skillet over medium-high heat.",
+    "Saute the diced onion, garlic, and ginger in the same pan for 5 minutes.",
+    "Combine the lamb, sauteed aromatics, tomato, and apricot in the tagine.",
+    "Roast in the oven for 90 minutes until the lamb is fork-tender.",
+    "Boil water and steam the couscous for 8 minutes.",
+    "Plate the tagine over couscous and garnish with chopped cilantro and toasted almond."
+  ]
+}

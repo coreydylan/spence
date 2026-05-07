@@ -1,0 +1,64 @@
+name = "recipe-graph"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+account_id = "8276973f31803dc6a1597c1396d64c4c"
+
+# D1 Database — the ingest + canonical data store
+[[d1_databases]]
+binding = "DB"
+database_name = "recipe-graph-db"
+database_id = "99cd2c21-0901-409b-8f46-3d046b52da76"
+
+# R2 Bucket — raw data ingest inbox + drafted recipe JSONs
+[[r2_buckets]]
+binding = "INGEST_BUCKET"
+bucket_name = "recipe-graph-ingest"
+
+# Workers AI — ingredient normalization, classification
+[ai]
+binding = "AI"
+
+# Pipeline Queue — per-recipe processing
+[[queues.producers]]
+queue = "recipe-pipeline"
+binding = "PIPELINE_QUEUE"
+
+[[queues.consumers]]
+queue = "recipe-pipeline"
+max_batch_size = 10
+max_retries = 3
+max_concurrency = 10
+
+# Legacy normalize queue (keep for backward compat)
+[[queues.producers]]
+queue = "ingredient-normalize"
+binding = "NORMALIZE_QUEUE"
+
+[[queues.consumers]]
+queue = "ingredient-normalize"
+max_batch_size = 1
+max_retries = 3
+max_concurrency = 25
+
+# Durable Objects — pipeline orchestrator + recipe sessions
+[durable_objects]
+bindings = [
+  { name = "PIPELINE_ORCHESTRATOR", class_name = "PipelineOrchestrator" },
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["PipelineOrchestrator"]
+
+# Workflows — per-recipe processing pipeline
+[[workflows]]
+name = "recipe-pipeline"
+binding = "RECIPE_PIPELINE"
+class_name = "RecipePipelineWorkflow"
+
+# Cron triggers — batch processing every 6 hours
+[triggers]
+crons = ["0 */6 * * *"]
+
+# Secrets (set via `wrangler secret put`)
+# ANTHROPIC_API_KEY — for Haiku/Sonnet calls during batch processing

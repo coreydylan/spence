@@ -1,0 +1,118 @@
+name = "mise-graph"
+main = "src/mise-graph-worker.ts"
+compatibility_date = "2026-04-28"
+compatibility_flags = ["nodejs_compat"]
+account_id = "8276973f31803dc6a1597c1396d64c4c"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "recipe-graph-db"
+database_id = "99cd2c21-0901-409b-8f46-3d046b52da76"
+
+# Wave 7 foundation — entity Durable Objects.
+# Each long-lived household entity gets its own DO with embedded SQLite (the
+# Cloudflare Agents SDK manages the per-instance database). Wave 7 ships the
+# skeletons only; Wave 7B wires the MCP handlers through the DOs. See
+# src/mise-graph/agents/README.md for the naming convention + state shape.
+
+[[durable_objects.bindings]]
+name = "HOUSEHOLD_AGENT"
+class_name = "HouseholdAgent"
+
+[[durable_objects.bindings]]
+name = "PLAN_AGENT"
+class_name = "PlanAgent"
+
+[[durable_objects.bindings]]
+name = "MEAL_AGENT"
+class_name = "MealAgent"
+
+[[durable_objects.bindings]]
+name = "SHOP_AGENT"
+class_name = "ShopAgent"
+
+[[durable_objects.bindings]]
+name = "COOK_AGENT"
+class_name = "CookAgent"
+
+[[durable_objects.bindings]]
+name = "MEMBER_AGENT"
+class_name = "MemberAgent"
+
+# Wave 8 foundation — ephemeral brigade lead, one DO per active cook session.
+[[durable_objects.bindings]]
+name = "COOKING_LEAD_AGENT"
+class_name = "CookingLeadAgent"
+
+# Wave 8B Track B — brigade photo storage. Each photo uploaded by a cook's
+# phone lands here under photos/<cook_session_id>/<photo_id>. The bucket
+# must be created out-of-band before deploy:
+#   wrangler r2 bucket create spence-brigade-photos --config wrangler.mise.toml
+# (we don't run this at build time; --dry-run validates the binding without
+# touching cloud state).
+[[r2_buckets]]
+binding = "BRIGADE_PHOTOS"
+bucket_name = "spence-brigade-photos"
+
+# SQLite-backed DO migration. All entity classes are SQLite-storage DOs —
+# required by the Agents SDK (it relies on per-DO `this.sql`). The v1 tag is
+# already deployed; never re-tag it. Wave 8 introduces a NEW v2 tag adding
+# CookingLeadAgent. Future class additions follow the same pattern (v3, v4,
+# …); never modify a deployed tag.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = [
+    "HouseholdAgent",
+    "PlanAgent",
+    "MealAgent",
+    "ShopAgent",
+    "CookAgent",
+    "MemberAgent",
+]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = [
+    "CookingLeadAgent",
+]
+
+# Mesh binding routes Worker fetch() into the Tailscale 100.96.0.10 network
+# where the claude-bridge daemon (officemac) listens on :8484. Same pattern
+# Reeve uses; lets the planner call Claude through Corey's CC subscription
+# instead of the API. See ~/Developer/claude-bridge for the daemon.
+[[vpc_networks]]
+binding = "MESH"
+network_id = "cf1:network"
+remote = true
+
+[vars]
+BRIDGE_HOST = "100.96.0.10"
+BRIDGE_PORT = "8484"
+
+# BRIDGE_SECRET (HMAC) must be set via:
+#   wrangler secret put BRIDGE_SECRET --config wrangler.mise.toml
+# Field secret id: f1c21b51-3890-4cee-9f38-df1cb4b240a9 (claude-bridge-hmac-secret)
+
+# Cloudflare Workflows binding for the durable mise-graph planner pipeline.
+# Each phase (compose → audit → revise → polish → persist) is a checkpointable
+# step, so transient bridge errors retry from the failed step. See
+# src/mise-graph/workflow-runner.ts for the PlannerWorkflow class.
+#
+# DISABLED for first e2e cut — the synchronous /mise-graph/plan route runs
+# the full pipeline (compose → post-pass → repair → revise → persist) in
+# one request. Workflows give us durability + retries; we'll re-enable when
+# we're ready to support multi-minute cross-restart plan sessions.
+# [[workflows]]
+# binding = "PLANNER_WORKFLOW"
+# name = "spence-planner-workflow"
+# class_name = "PlannerWorkflow"
+
+# DAILY CHECK-IN CRON (Wave 5F to enable):
+#
+# Wires the morning chef-of-staff brief. When uncommented, fires
+# handleDailyCheckin() from src/mise-graph/cron-daily-checkin.ts each day
+# at 14:00 UTC (= 7am Pacific). Adjust the cron once a per-household
+# timezone model lands so each home gets its brief at local 7am.
+#
+# [triggers]
+# crons = ["0 14 * * *"]   # 7am Pacific = 14:00 UTC. Adjust if household tz model lands.

@@ -1,0 +1,23 @@
+{
+  "_description": "Test 1 intent — 7 dinners, vegetarian, anchors=[chickpea,tahini], requires Mediterranean and Asian, soft-prefer leftover yield. Used by t01.",
+  "household_id": "corey",
+  "start_date": "2026-05-11",
+  "end_date": "2026-05-17",
+  "people_default": 2,
+  "ingredients": ["chickpea", "tahini", "preserved lemon", "asparagus", "tofu", "kimchi", "gochujang", "feta", "sumac"],
+  "cuisine_direction": ["Mediterranean", "Asian-inspired"],
+  "dietary": ["vegetarian"],
+  "equipment": ["oven", "cast-iron skillet", "ooni pizza oven", "blender", "food processor"],
+  "pantry": ["olive oil", "flour", "rice", "kosher salt", "black pepper", "cumin", "sumac", "coriander", "yogurt", "feta", "gochujang", "miso", "kimchi", "tahini", "preserved lemon"],
+  "prompt": "Plan dinners for a week. Soft preference: most dinners should yield leftovers for next-day lunch. Need at least one Mediterranean dinner and one Asian-inspired dinner. Diverse formats and cuisines welcome.",
+  "_test_assertions": {
+    "min_meals": 7,
+    "must_include_cuisines_any_of": [
+      ["Mediterranean", "Levantine", "Greek", "Italian", "Spanish", "Provençal", "North African"],
+      ["Japanese", "Korean", "Thai", "Vietnamese", "Chinese", "Pan-Asian", "Korean-Mexican", "Korean-Italian", "Indian"]
+    ],
+    "min_dinners_with_leftovers": 4,
+    "max_dietary_violations": 0,
+    "compose_mode": "llm"
+  }
+}
