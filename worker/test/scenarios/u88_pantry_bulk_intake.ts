@@ -95,14 +95,16 @@ chickpeas`; // duplicate at the end, must be deduped.
 		const sourcedFromBulk = inv.filter(i => i.source === "bulk_intake");
 		ctx.assert.gte(sourcedFromBulk.length, 30, "all rich items tagged source=bulk_intake");
 
-		// 6. Bare pantry path (<=8 items) fires shop-fresh delta toward 1.0.
+		// 6. Bare pantry path (<=4 items, calibrated band) fires shop-fresh delta.
+		// Calibration nudge moved the strict-bare threshold to ≤4 items so the
+		// "5 items, mostly oil + spices" cases stay in the ambiguous middle.
 		const bareResult = await setPantryBulk(env, {
 			household_id: "hh_u88_bare",
 			mode: "text",
-			text: "olive oil\nsalt\npepper\ngarlic\nlemons",
+			text: "olive oil\nsalt\npepper\nlemons",
 		});
 		ctx.assert.eq(bareResult.ok, true, "bare pantry write succeeded");
-		ctx.assert.eq(bareResult.items_recorded, 5, "bare pantry has 5 items");
+		ctx.assert.eq(bareResult.items_recorded, 4, "bare pantry has 4 items");
 		ctx.assert.contains(bareResult.trait_deltas, "pantry_first_vs_shop_fresh", "shop-fresh delta fired");
 
 		const bareTraits = await listTraits(env, "hh_u88_bare");
@@ -110,11 +112,12 @@ chickpeas`; // duplicate at the end, must be deduped.
 		ctx.assert.ok(!!bareTrait, "trait persisted for bare pantry");
 		ctx.assert.gte(bareTrait!.trait_value, 0.5, "bare pantry moves trait toward 1.0 (shop-fresh end)");
 
-		// 7. Mid-size pantry (between thresholds) fires NO trait delta.
+		// 7. Mid-size pantry (between thresholds, 5-9 items) fires NO trait delta.
+		// Calibration nudge band: 5-9 items = ambiguous middle.
 		const midResult = await setPantryBulk(env, {
 			household_id: "hh_u88_mid",
 			mode: "text",
-			text: "rice\noats\nquinoa\ntomatoes\nonions\ngarlic\nyogurt\nbutter\nfeta\nparsley\nlemons\nolive oil\ntahini\nharissa\nmiso",
+			text: "rice\noats\nquinoa\ntomatoes\nonions\ngarlic\nyogurt",
 		});
 		ctx.assert.eq(midResult.ok, true, "mid pantry write succeeded");
 		ctx.assert.eq(midResult.trait_deltas.length, 0, "mid-size pantry fires no trait delta (between thresholds)");

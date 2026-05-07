@@ -24,6 +24,11 @@ import { loadRecentFeedback, mealFeedbackHints, type MealFeedbackHints } from ".
 import { loadPantryPressure, type PantryPressureContext } from "./pantry-pressure";
 import { loadFormatLibrary, formatLibraryForComposer, type FormatPromptShape } from "./format-library-loader";
 import { loadCuisineFusions, loadFlavorVibes, formatCuisineFusionsForPrompt, formatFlavorVibesForPrompt } from "./cuisine-fusions";
+import {
+	buildHouseholdSignals,
+	type BuildHouseholdSignalsOptions,
+	type HouseholdSignals,
+} from "./household-signals";
 
 export interface ComposerContextBundle {
 	dish_candidates: ContextDish[];
@@ -40,6 +45,10 @@ export interface ComposerContextBundle {
 	format_library?: FormatPromptShape[] | null;
 	cuisine_fusions_lines?: string[] | null;
 	flavor_vibe_lines?: string[] | null;
+	// Onboarding-collected household personality + state. Populated when the
+	// caller passes a household_id; null otherwise. Kept small (<5KB typical)
+	// so it fits in the composer's prompt budget. See household-signals.ts.
+	household_signals?: HouseholdSignals | null;
 }
 
 export interface ContextDish {
@@ -139,6 +148,7 @@ export async function loadComposerContext(env: MiseGraphEnv, request: ComposerCo
 		formatLibrary,
 		cuisineFusionLines,
 		flavorVibeLines,
+		householdSignals,
 	] = await Promise.all([
 		loadDishCandidates(env, request.anchors, limit),
 		loadComponentCandidates(env, request.anchors, limit),
@@ -160,6 +170,15 @@ export async function loadComposerContext(env: MiseGraphEnv, request: ComposerCo
 		loadFormatLibrary(env).then(lib => formatLibraryForComposer(lib, { max_cuisines_per_format: 4, max_ingredients_per_slot: 3 })).catch(() => null),
 		loadCuisineFusions(env, { min_affinity: 0.5 }).then(fusions => formatCuisineFusionsForPrompt(fusions)).catch(() => null),
 		loadFlavorVibes(env, { max: 24 }).then(vibes => formatFlavorVibesForPrompt(vibes)).catch(() => null),
+		// Household signals — onboarding personality + traditions + pantry top
+		// + equipment + avoidances. The composer prompt should consume
+		// household_signals.personality.summary directly to ground tone, AND
+		// surface member_spread_guidance into meal notes when non-null.
+		// Compose-time enforcement (e.g. honor traditions, prefer pantry items)
+		// is a follow-up — for now we just pipe the signal through.
+		request.household_id
+			? loadHouseholdSignals(env, request.household_id).catch(() => null)
+			: Promise.resolve(null),
 	]);
 	return {
 		dish_candidates: dishes,
@@ -176,8 +195,29 @@ export async function loadComposerContext(env: MiseGraphEnv, request: ComposerCo
 		format_library: formatLibrary,
 		cuisine_fusions_lines: cuisineFusionLines,
 		flavor_vibe_lines: flavorVibeLines,
+		household_signals: householdSignals,
 	};
 }
+
+/**
+ * Convenience wrapper around buildHouseholdSignals — the composer's
+ * integration point for onboarding-collected personality, traditions,
+ * pantry, equipment, and avoidances.
+ *
+ * Existing callers of loadComposerContext get household_signals folded into
+ * the bundle for free. Direct callers (the inspire-tools household context
+ * read, the new inspire_read_household_signals MCP tool) use this wrapper
+ * to share the same options shape.
+ */
+export async function loadHouseholdSignals(
+	env: MiseGraphEnv,
+	household_id: string,
+	options: BuildHouseholdSignalsOptions = {},
+): Promise<HouseholdSignals> {
+	return buildHouseholdSignals(env, household_id, options);
+}
+
+export type { HouseholdSignals, BuildHouseholdSignalsOptions } from "./household-signals";
 
 export async function loadDishCandidates(env: MiseGraphEnv, anchors: string[], limit: number): Promise<ContextDish[]> {
 	// When called with no anchors, fall back to top dishes by recipe_count —

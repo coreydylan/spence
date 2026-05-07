@@ -21,6 +21,7 @@ import {
 } from "./base";
 import {
 	computeMorningBrief,
+	loadBriefForDate,
 	loadLatestBrief,
 	nextLocal7am,
 	persistMorningBrief,
@@ -125,6 +126,101 @@ export class HouseholdAgent extends Agent<AgentEnv, HouseholdAgentState> {
 			}
 			const brief = await loadLatestBrief(this.env, this.state.household_id);
 			return json({ ok: true, brief });
+		}
+
+		// Wave 7F — POST /daily-brief drives the brief from outside the alarm.
+		// The cron sweep calls this for every active household at 14:00 UTC.
+		// Body: { for_date?: "YYYY-MM-DD", timezone?: string, force?: boolean }
+		// Returns: { ok: true, brief: MorningBriefResult, persisted: { id, ... } }
+		if (route === "daily-brief" && request.method === "POST") {
+			if (!this.state.household_id) {
+				return json({ error: "household_id not initialized" }, 400);
+			}
+			const body = (await request.json().catch(() => ({}))) as {
+				for_date?: string;
+				timezone?: string;
+				force?: boolean;
+			};
+			const trace = beginTrace({
+				tool_name: "household_agent.daily_brief",
+				tool_args: body,
+				caller_kind: "cron",
+				caller_id: householdAgentName(this.state.household_id),
+				household_id: this.state.household_id,
+			});
+			try {
+				const now = body.for_date && /^\d{4}-\d{2}-\d{2}$/.test(body.for_date)
+					? new Date(`${body.for_date}T14:00:00Z`)
+					: new Date();
+				// If a brief already exists for this date and force=false, return it.
+				if (!body.force) {
+					const existing = await loadBriefForDate(
+						this.env,
+						this.state.household_id,
+						now.toISOString().slice(0, 10),
+					);
+					if (existing) {
+						await completeTrace(this.env, trace, {
+							ok: true,
+							result: { reused: true, brief_id: existing.id },
+							result_summary: `daily_brief reused id=${existing.id}`,
+						});
+						return json({
+							ok: true,
+							reused: true,
+							brief: existing,
+							persisted: {
+								id: existing.id,
+								household_id: existing.household_id,
+								for_date: existing.for_date,
+								created_at_ms: existing.created_at_ms,
+							},
+							trace_id: trace.trace_id,
+						});
+					}
+				}
+				const brief = await computeMorningBrief(this.env, this.state.household_id, {
+					now,
+					skip_weather: true,
+				});
+				const persisted = await persistMorningBrief(this.env, brief);
+				this.sql`
+					INSERT INTO checkins (id, at_ms, result, brief_id, trace_id)
+					VALUES (
+						${generateAgentId("ck")},
+						${Date.now()},
+						${"cron"},
+						${persisted.id},
+						${trace.trace_id}
+					)
+				`;
+				this.setState({
+					...this.state,
+					last_brief_at_ms: Date.now(),
+					last_brief_id: persisted.id,
+				});
+				await completeTrace(this.env, trace, {
+					ok: true,
+					result: {
+						brief_id: persisted.id,
+						plan_count: brief.plan_health.length,
+						suggestion_count: brief.suggestions.length,
+						timezone: body.timezone || null,
+					},
+					result_summary: `daily_brief brief=${persisted.id} plans=${brief.plan_health.length}`,
+				});
+				return json({
+					ok: true,
+					reused: false,
+					brief,
+					persisted,
+					trace_id: trace.trace_id,
+				});
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				await completeTrace(this.env, trace, { ok: false, error: message });
+				return json({ error: message }, 500);
+			}
 		}
 
 		if (route === "spawn-plan" && request.method === "POST") {

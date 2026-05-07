@@ -53,8 +53,19 @@ export interface SetPantryBulkResult {
 	error?: string;
 }
 
-const PANTRY_RICH_THRESHOLD = 30;
-const PANTRY_BARE_THRESHOLD = 8;
+// Calibration nudge thresholds (post-week-1 review).
+//
+// First-week sim showed that real households *almost never* keep ≥30 staples,
+// so the trait delta never fired. Walked the bands down so realistic intakes
+// move the needle:
+//
+//   ≥20 items → strongly pantry-first (delta_value=0.0, conf=0.3)
+//   ≥10 items → somewhat pantry-first (delta_value=0.25, conf=0.2)
+//    ≤4 items → shop-fresh leaning    (delta_value=0.85, conf=0.15)
+//   5-9 items → ambiguous middle, no delta
+const PANTRY_STRONG_RICH_THRESHOLD = 20;
+const PANTRY_SOMEWHAT_RICH_THRESHOLD = 10;
+const PANTRY_BARE_THRESHOLD = 4;
 
 export async function setPantryBulk(
 	env: MiseGraphEnv,
@@ -227,11 +238,14 @@ async function runVisionPantry(
 }
 
 function pantryCountToDelta(count: number): { delta_value: number; delta_confidence: number } | null {
-	if (count >= PANTRY_RICH_THRESHOLD) {
-		return { delta_value: 0.0, delta_confidence: 0.4 };
+	if (count >= PANTRY_STRONG_RICH_THRESHOLD) {
+		return { delta_value: 0.0, delta_confidence: 0.3 };
+	}
+	if (count >= PANTRY_SOMEWHAT_RICH_THRESHOLD) {
+		return { delta_value: 0.25, delta_confidence: 0.2 };
 	}
 	if (count > 0 && count <= PANTRY_BARE_THRESHOLD) {
-		return { delta_value: 1.0, delta_confidence: 0.3 };
+		return { delta_value: 0.85, delta_confidence: 0.15 };
 	}
 	return null;
 }
@@ -251,7 +265,15 @@ export interface SetEquipmentBulkResult {
 	trait_deltas: TraitName[];
 }
 
-const EQUIPMENT_RICH_THRESHOLD = 15;
+// Calibration nudge thresholds (post-week-1 review). Most households named
+// 8-12 pieces and the old 15-only band kept missing them.
+//
+//   ≥15 slugs → strongly rich        (delta_value=0.0, conf=0.3)
+//   ≥8  slugs → somewhat rich        (delta_value=0.3, conf=0.2)
+//   ≤4  slugs → minimalist           (delta_value=0.9, conf=0.2)
+//   5-7 slugs → ambiguous, no delta
+const EQUIPMENT_STRONG_RICH_THRESHOLD = 15;
+const EQUIPMENT_SOMEWHAT_RICH_THRESHOLD = 8;
 const EQUIPMENT_MINIMALIST_THRESHOLD = 4;
 
 export async function setEquipmentBulk(
@@ -266,7 +288,7 @@ export async function setEquipmentBulk(
 	const newly: string[] = [];
 	const already: string[] = [];
 	for (const slug of cleaned) {
-		const before = await readEquipmentSlugExists(env, slug);
+		const before = await readEquipmentSlugExists(env, household_id, slug);
 		try {
 			await ensureEquipmentDefined(env, household_id, slug);
 			if (before) already.push(slug);
@@ -306,20 +328,28 @@ export async function setEquipmentBulk(
 }
 
 function equipmentCountToDelta(count: number): { delta_value: number; delta_confidence: number } | null {
-	if (count >= EQUIPMENT_RICH_THRESHOLD) {
-		return { delta_value: 0.0, delta_confidence: 0.4 };
+	if (count >= EQUIPMENT_STRONG_RICH_THRESHOLD) {
+		return { delta_value: 0.0, delta_confidence: 0.3 };
+	}
+	if (count >= EQUIPMENT_SOMEWHAT_RICH_THRESHOLD) {
+		return { delta_value: 0.3, delta_confidence: 0.2 };
 	}
 	if (count > 0 && count <= EQUIPMENT_MINIMALIST_THRESHOLD) {
-		return { delta_value: 1.0, delta_confidence: 0.3 };
+		return { delta_value: 0.9, delta_confidence: 0.2 };
 	}
 	return null;
 }
 
-async function readEquipmentSlugExists(env: MiseGraphEnv, slug: string): Promise<boolean> {
+async function readEquipmentSlugExists(
+	env: MiseGraphEnv,
+	household_id: string,
+	slug: string,
+): Promise<boolean> {
 	try {
 		const row = await env.DB.prepare(
-			`SELECT slug FROM mise_equipment_definitions WHERE slug = ? LIMIT 1`,
-		).bind(slug).first<{ slug: string }>();
+			`SELECT slug FROM mise_equipment_definitions
+			 WHERE household_id = ? AND slug = ? LIMIT 1`,
+		).bind(household_id, slug).first<{ slug: string }>();
 		return !!row;
 	} catch {
 		return false;
@@ -609,7 +639,8 @@ async function persistTraitDelta(
 		).bind(
 			household_id,
 			trait_name,
-			null,
+			// Phase D PK includes member_id; '' = household-level row.
+			"",
 			updated.new_value,
 			updated.new_confidence,
 			now,
@@ -626,8 +657,11 @@ async function loadTraitRow(
 	household_id: string,
 	trait_name: TraitName,
 ): Promise<Trait | null> {
+	// Pantry/equipment bulk intake writes household-level rows only — find
+	// the row whose member_id is empty (or NULL on legacy DBs).
 	const traits = await listTraits(env, household_id);
-	return traits.find(t => t.trait_name === trait_name) ?? null;
+	return traits.find(t => t.trait_name === trait_name
+		&& (t.member_id === null || t.member_id === "")) ?? null;
 }
 
 function isKnownTrait(name: string): name is TraitName {

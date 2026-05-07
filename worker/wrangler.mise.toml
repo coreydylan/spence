@@ -107,12 +107,17 @@ BRIDGE_PORT = "8484"
 # name = "spence-planner-workflow"
 # class_name = "PlannerWorkflow"
 
-# DAILY CHECK-IN CRON (Wave 5F to enable):
+# DAILY MORNING-BRIEF CRON.
 #
-# Wires the morning chef-of-staff brief. When uncommented, fires
-# handleDailyCheckin() from src/mise-graph/cron-daily-checkin.ts each day
-# at 14:00 UTC (= 7am Pacific). Adjust the cron once a per-household
-# timezone model lands so each home gets its brief at local 7am.
+# Fires the Worker's `scheduled()` handler once per day at 14:00 UTC
+# (= 7am Pacific). The handler walks every active household and invokes
+# its HouseholdAgent /daily-brief route, which runs `computeMorningBrief`
+# + persists to `mise_household_agent_briefs`.
 #
-# [triggers]
-# crons = ["0 14 * * *"]   # 7am Pacific = 14:00 UTC. Adjust if household tz model lands.
+# Phase 1: single global cron at 14:00 UTC. Per-household timezones are
+# READ from `mise_household_profiles.timezone` and passed through to the
+# brief, but the cron itself fires for everyone at the same UTC instant.
+# Phase 2 will shard the cron by tz so each household gets its brief at
+# local 7am instead of 7am-Pacific-for-everyone.
+[triggers]
+crons = ["0 14 * * *"]   # 7am Pacific = 14:00 UTC. Phase 2 may shard by tz.

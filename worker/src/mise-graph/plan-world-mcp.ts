@@ -68,6 +68,7 @@ import {
 	inspireReadFlavorVibes,
 	inspireReadFormatLibrary,
 	inspireReadHouseholdContext,
+	inspireReadHouseholdSignals,
 	inspireReadRecentMenu,
 	inspireReadRecipeLibrary,
 	inspireReadSeasonality,
@@ -151,6 +152,10 @@ import {
 	type ConceptSourceKind,
 	type ConceptStatus,
 } from "./concept-board";
+import {
+	loadBriefForDate,
+	loadLatestBrief,
+} from "./agents/household-cycles";
 import {
 	routeCookingLead,
 	routeMealCancelled,
@@ -420,6 +425,8 @@ export async function callPlanWorldTool(
 			return await inspireReadFormatLibrary(env, args as Parameters<typeof inspireReadFormatLibrary>[1]) as unknown as Record<string, unknown>;
 		case "inspire_read_household_context":
 			return await inspireReadHouseholdContext(env, args as Parameters<typeof inspireReadHouseholdContext>[1]) as unknown as Record<string, unknown>;
+		case "inspire_read_household_signals":
+			return await inspireReadHouseholdSignals(env, args as unknown as Parameters<typeof inspireReadHouseholdSignals>[1]) as unknown as Record<string, unknown>;
 
 		// ── Weather + calendar (Wave 6) ───────────────────────────────────
 		case "inspire_read_weather": return await toolReadWeather(args, env);
@@ -460,6 +467,9 @@ export async function callPlanWorldTool(
 
 		// ── Onboarding (Phase D) — multi-member trait spread analyzer ──────
 		case "household_get_trait_spread": return await toolGetTraitSpread(args, env);
+
+		// ── Wave 7F — read today's morning brief (cron output) ─────────────
+		case "household_read_brief": return await toolReadBrief(args, env);
 
 		// ── Concept board (Wave 6) — Phase-1 inspiration sticky-notes ────
 		case "inspire_set_movement": return await toolInspireSetMovement(args, env);
@@ -829,12 +839,16 @@ async function toolComposeMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 	const formatStr = composedMeal?.format ?? "?";
 	const cuisineStr = (composedMeal?.cuisine || []).join(",") || "?";
 	const peopleStr = String(composedMeal?.people ?? "?");
+	// Phase D fix: thread member_id when the compose call was attributed to a
+	// specific cook. Falls back to household-level when absent.
+	const composeMemberId = optionalString(args.member_id);
 	await observeFromTool(env, {
 		household_id: updated.household_id ?? null,
 		plan_id: planId,
 		observation_kind: "meal_composed",
 		observation_text: `format=${formatStr} cuisine=${cuisineStr} people=${peopleStr}`,
 		context: { repeat_count },
+		member_id: composeMemberId,
 	});
 
 	return {
@@ -852,6 +866,7 @@ async function toolCancelMeal(args: Record<string, unknown>, env: MiseGraphEnv):
 	const slot = requireSlotFromArgs(args);
 	const reason = optionalString(args.reason) ?? "manual_cancel";
 	const within2h = typeof args.within_cook_window_2h === "boolean" ? args.within_cook_window_2h : undefined;
+	const memberId = optionalString(args.member_id);
 	const result = await applyMutation(env, args, plan => previewCancelMeal(plan, slot));
 	// Wave 7B Phase 2: signal the MealAgent so it can release equipment claims
 	// and write a phase_transition row. Best-effort; D1 is authoritative.
@@ -863,11 +878,13 @@ async function toolCancelMeal(args: Record<string, unknown>, env: MiseGraphEnv):
 			reason,
 		});
 		// Phase C observation: cancellation is evidence of time pressure.
+		// Phase D fix: thread member_id when supplied.
 		await observeFromTool(env, {
 			plan_id: planId,
 			observation_kind: "meal_cancelled",
 			observation_text: reason,
 			context: within2h !== undefined ? { cancel_within_2h: within2h } : undefined,
+			member_id: memberId,
 		});
 	}
 	return result;
@@ -878,13 +895,16 @@ async function toolSwapIngredient(args: Record<string, unknown>, env: MiseGraphE
 	const fromName = requireString(args.from_name, "from_name");
 	const toName = requireString(args.to_name, "to_name");
 	const planId = optionalString(args.plan_id);
+	const memberId = optionalString(args.member_id);
 	const result = await applyMutation(env, args, plan => previewSwapIngredient(plan, slot, fromName, toName));
 	// Phase C observation: ingredient swap = improvisation evidence.
+	// Phase D fix: thread member_id when supplied.
 	if (result.ok !== false) {
 		await observeFromTool(env, {
 			plan_id: planId ?? null,
 			observation_kind: "ingredient_swap",
 			observation_text: `${fromName}→${toName}`,
+			member_id: memberId,
 		});
 	}
 	return result;
@@ -913,12 +933,15 @@ async function toolReplaceMeal(args: Record<string, unknown>, env: MiseGraphEnv)
 		must_avoid: stringArray(args.must_avoid),
 	}));
 	// Phase C observation: replace = mild dissatisfaction signal (logged only).
+	// Phase D fix: thread member_id when supplied.
 	if (result.ok !== false) {
 		const newTitle = typeof newMeal.title === "string" ? newMeal.title : "(meal)";
+		const memberId = optionalString(args.member_id);
 		await observeFromTool(env, {
 			plan_id: planId ?? null,
 			observation_kind: "meal_replaced",
 			observation_text: `${slot.date}/${slot.slot} → ${newTitle}`,
+			member_id: memberId,
 		});
 	}
 	return result;
@@ -2252,10 +2275,14 @@ async function toolObserveResponse(args: Record<string, unknown>, env: MiseGraph
 
 async function toolGetNextQuestion(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
 	const household_id = requireString(args.household_id, "household_id");
-	const status = await statusOnboarding(env, { household_id });
 	const recent = await listOnboardingResponses(env, household_id);
 	const now = Date.now();
-	const engagement = computeEngagementSignal(recent, now);
+	const engagement = round3(computeEngagementSignal(recent, now));
+	// Calibration: pull the state row through statusOnboarding so it stays in
+	// sync with engagement_signal cache (statusOnboarding refreshes the cache
+	// when the live value drifts). Both tools must agree on engagement_signal
+	// — same input, same output.
+	const status = await statusOnboarding(env, { household_id });
 	const picked = pickQuestionForBrief({
 		state: status.state,
 		recent_responses: recent,
@@ -2265,7 +2292,7 @@ async function toolGetNextQuestion(args: Record<string, unknown>, env: MiseGraph
 	});
 	return {
 		household_id,
-		engagement_signal: round3(engagement),
+		engagement_signal: engagement,
 		picked: picked
 			? {
 				question_kind: picked.question.kind,
@@ -2296,6 +2323,63 @@ async function toolGetTraitSpread(args: Record<string, unknown>, env: MiseGraphE
 			status: s.status,
 			description: s.description,
 		})),
+	};
+}
+
+// ─── Wave 7F — read today's morning brief ─────────────────────────────────
+//
+// Returns the brief row written by the cron sweep / HouseholdAgent for the
+// requested household + date. When `date` is omitted defaults to today (UTC).
+// When no brief exists, returns `{ ok: false, reason: "no_brief" }` so callers
+// can disambiguate "miss" from "schema not migrated".
+
+async function toolReadBrief(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const dateRaw = optionalString(args.date);
+	const for_date = dateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw)
+		? dateRaw
+		: new Date().toISOString().slice(0, 10);
+
+	const brief = await loadBriefForDate(env, household_id, for_date);
+	if (!brief) {
+		// As a fallback, also surface the most recent brief for the household
+		// when the caller asked for "today" and didn't supply a date — that
+		// helps the caller disambiguate "today's brief hasn't fired yet" from
+		// "this household has no briefs at all".
+		const fallback = !dateRaw ? await loadLatestBrief(env, household_id) : null;
+		return {
+			ok: false,
+			reason: "no_brief",
+			household_id,
+			for_date,
+			latest: fallback
+				? {
+					id: fallback.id,
+					for_date: fallback.for_date,
+					generated_at_ms: fallback.created_at_ms,
+				}
+				: null,
+		};
+	}
+
+	const counts: Record<string, number> = {};
+	for (const s of brief.suggestions) {
+		counts[s.kind] = (counts[s.kind] || 0) + 1;
+	}
+
+	return {
+		ok: true,
+		brief: {
+			household_id: brief.household_id,
+			date: brief.for_date,
+			generated_at_ms: brief.created_at_ms,
+			weather: brief.weather,
+			calendar: brief.calendar,
+			plan_health: brief.plan_health,
+			suggestions: brief.suggestions,
+			onboarding_question: brief.onboarding_question ?? null,
+			notifications_summary: { count_by_kind: counts },
+		},
 	};
 }
 
@@ -3245,7 +3329,7 @@ const PLAN_WORLD_TOOLS = [
 			max_ingredients_per_slot: { type: "number" },
 		},
 	}),
-	tool("inspire_read_household_context", "Master inspiration read: gathers seasonality, anchor pressure, recent menu, taste feedback, recipe library, canonical dishes/components, affinity pairs, flavor compounds, cuisine fusions, flavor vibes, and format library in one call. Phase 1 of every planning turn — call this first, then drill in. Use compact=true (~6KB) for the structural overview; full mode (~40KB) when you need the example dishes / fusion notes / vibe descriptions.", {
+	tool("inspire_read_household_context", "Master inspiration read: gathers seasonality, anchor pressure, recent menu, taste feedback, recipe library, canonical dishes/components, affinity pairs, flavor compounds, cuisine fusions, flavor vibes, format library, AND household signals (onboarding personality + traditions + pantry top + equipment + avoidances) in one call. Phase 1 of every planning turn — call this first, then drill in. Use compact=true (~6KB) for the structural overview; full mode (~40KB) when you need the example dishes / fusion notes / vibe descriptions.", {
 		type: "object",
 		required: ["household_id"],
 		properties: {
@@ -3257,6 +3341,21 @@ const PLAN_WORLD_TOOLS = [
 			anchors: { type: "array", items: { type: "string" }, description: "Optional anchors to seed canonical lookups. If omitted, derived from loved + trending anchors." },
 			compact: { type: "boolean", description: "Tighten per-section limits and strip bulky example arrays from vibes / fusions / format library. Default false. Cuts payload ~6–8×." },
 			per_section_limit: { type: "integer", minimum: 1, description: "Override per-section item count. Default 12 (full mode) or 4 (compact)." },
+			include_household_signals: { type: "boolean", description: "Default true. Set false to omit onboarding signals (personality summary, traditions, pantry top, equipment, avoidances)." },
+		},
+	}),
+	tool("inspire_read_household_signals", "Read onboarding-collected household signals: 7-dimension personality rendered as a single natural-language summary, traditions (Friday pizza night, etc.), pantry top items by category, equipment slugs available, avoidances (dietary/allergies/dislikes aggregated across members), and member_spread_guidance (when traits diverge across members — e.g. 'Corey leans comfort, Katrina leans adventure'). Use when composing meals to ground tone in personality and respect avoidances + pantry. Payload is small (<5KB typical) so it's cheap to call on every compose turn.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+			include_personality: { type: "boolean", description: "Default true." },
+			include_traditions: { type: "boolean", description: "Default true." },
+			include_pantry: { type: "boolean", description: "Default true." },
+			include_equipment: { type: "boolean", description: "Default true." },
+			pantry_per_category_limit: { type: "integer", minimum: 1, description: "Top N pantry items per category. Default 10." },
+			equipment_limit: { type: "integer", minimum: 1, description: "Max equipment slugs returned. Default 50." },
+			traditions_limit: { type: "integer", minimum: 1, description: "Max active traditions returned. Default 20." },
 		},
 	}),
 
@@ -3633,6 +3732,14 @@ const PLAN_WORLD_TOOLS = [
 		required: ["household_id"],
 		properties: {
 			household_id: { type: "string" },
+		},
+	}),
+	tool("household_read_brief", "Read the morning brief for a household + date (defaults to today UTC). Returns the persisted brief from mise_household_agent_briefs including weather, calendar windows, plan health snapshots, suggestions, and the onboarding question (if one was surfaced). Returns { ok: false, reason: 'no_brief' } when the cron sweep hasn't generated a brief yet — and surfaces `latest` as a hint to the caller when querying today.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+			date: { type: "string", description: "Optional YYYY-MM-DD. Defaults to today (UTC)." },
 		},
 	}),
 

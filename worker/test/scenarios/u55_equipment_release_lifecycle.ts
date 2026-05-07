@@ -116,7 +116,10 @@ const u55: Scenario = {
 		ctx.assert.ok(bulk.ok, "all three bulk claims granted");
 		ctx.assert.eq(bulk.granted.length, 3, "three claims persisted");
 
-		const releasedCount = await releaseClaimsFor(env, { kind: "meal", id: "bulk_meal" });
+		const releasedCount = await releaseClaimsFor(env, {
+			household_id: HH,
+			claim_for: { kind: "meal", id: "bulk_meal" },
+		});
 		ctx.assert.eq(releasedCount, 3, "releaseClaimsFor returns count released");
 
 		// All three rows now in 'released' status.
@@ -126,7 +129,10 @@ const u55: Scenario = {
 		ctx.assert.eq(stillHeld.length, 0, "no held claims remain for bulk_meal");
 
 		// ── 3. Re-releasing is a no-op ─────────────────────────────────────
-		const repeat = await releaseClaimsFor(env, { kind: "meal", id: "bulk_meal" });
+		const repeat = await releaseClaimsFor(env, {
+			household_id: HH,
+			claim_for: { kind: "meal", id: "bulk_meal" },
+		});
 		ctx.assert.eq(repeat, 0, "second releaseClaimsFor returns 0");
 
 		// ── 4. Released claims invisible to load metric ───────────────────

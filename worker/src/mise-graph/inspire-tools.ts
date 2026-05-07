@@ -22,6 +22,7 @@ import {
 	loadCompoundPairings,
 	loadComponentCandidates,
 	loadDishCandidates,
+	loadHouseholdSignals,
 	loadSeasonal,
 	type ContextAffinity,
 	type ContextComponent,
@@ -30,6 +31,7 @@ import {
 	type ContextPersonalRecipe,
 	type ContextSeasonalItem,
 } from "./composer-context";
+import type { BuildHouseholdSignalsOptions, HouseholdSignals } from "./household-signals";
 import { loadRecentMenuContext, type RecentMenuContext } from "./window-memory";
 import { loadRecentFeedback, mealFeedbackHints, type MealFeedbackHints } from "./recipe-feedback";
 import {
@@ -491,6 +493,11 @@ export interface HouseholdContextResult {
 	cuisine_fusions: CuisineFusionsResult;
 	flavor_vibes: FlavorVibesResult;
 	format_library: FormatLibraryResult;
+	// Onboarding-collected personality, traditions, pantry top, equipment,
+	// avoidances. Included by default in both compact and full mode — the
+	// personality.summary is small (one sentence) and the most useful single
+	// signal in the bundle.
+	household_signals?: HouseholdSignals | null;
 }
 
 export async function inspireReadHouseholdContext(
@@ -508,6 +515,9 @@ export async function inspireReadHouseholdContext(
 		// that just need a structural overview.
 		compact?: boolean;
 		per_section_limit?: number;
+		// Set false to omit household_signals (onboarding personality + state).
+		// Default true — the personality summary is small and load-bearing.
+		include_household_signals?: boolean;
 	},
 ): Promise<HouseholdContextResult> {
 	const householdId = requireString(args.household_id, "household_id");
@@ -525,6 +535,8 @@ export async function inspireReadHouseholdContext(
 	// passed — that's the agent's default intent on first-turn read.
 	const anchorsArg = lowerStringArray(args.anchors);
 
+	const includeSignals = args.include_household_signals !== false;
+
 	// Run the cheap parallel reads first; we may need anchor_pressure to
 	// derive the anchors used by canonical_*/affinity_*/compound_* tools.
 	const [
@@ -536,6 +548,7 @@ export async function inspireReadHouseholdContext(
 		cuisineFusionsResult,
 		flavorVibesResult,
 		formatLibraryResult,
+		householdSignals,
 	] = await Promise.all([
 		inspireReadSeasonality(env, { region, dates, limit: compact ? perSection : perSection * 2 }),
 		inspireReadAnchorPressure(env, { household_id: householdId, lookback_days: lookback }),
@@ -548,6 +561,15 @@ export async function inspireReadHouseholdContext(
 			max_cuisines_per_format: compact ? 1 : 3,
 			max_ingredients_per_slot: compact ? 1 : 3,
 		}),
+		includeSignals
+			? loadHouseholdSignals(env, householdId, {
+				// In compact mode, halve the pantry/equipment lists. The
+				// personality.summary stays full because it's a single sentence.
+				pantry_per_category_limit: compact ? 5 : 10,
+				equipment_limit: compact ? 25 : 50,
+				traditions_limit: compact ? 10 : 20,
+			}).catch(() => null)
+			: Promise.resolve(null),
 	]);
 
 	// In compact mode, strip the bulky example arrays from vibes / fusions.
@@ -586,7 +608,52 @@ export async function inspireReadHouseholdContext(
 		cuisine_fusions: cuisineFusionsResult,
 		flavor_vibes: flavorVibesResult,
 		format_library: formatLibraryResult,
+		household_signals: householdSignals,
 	};
+}
+
+// ---------- 14. Household signals (onboarding personality + state) ----------
+
+export interface HouseholdSignalsArgs {
+	household_id: string;
+	include_personality?: boolean;
+	include_traditions?: boolean;
+	include_pantry?: boolean;
+	include_equipment?: boolean;
+	pantry_per_category_limit?: number;
+	equipment_limit?: number;
+	traditions_limit?: number;
+}
+
+/**
+ * Direct read of household_signals — onboarding-collected personality
+ * dimensions + summary + traditions + pantry top + equipment + avoidances.
+ *
+ * Use this when the agent specifically wants to ground tone in the household's
+ * personality without pulling the full master context (which is ~10× larger
+ * even in compact mode). The personality.summary in particular is tiny and
+ * extremely load-bearing for the meal compose prompt.
+ */
+export async function inspireReadHouseholdSignals(
+	env: MiseGraphEnv,
+	args: HouseholdSignalsArgs,
+): Promise<HouseholdSignals> {
+	const householdId = requireString(args.household_id, "household_id");
+	const options: BuildHouseholdSignalsOptions = {};
+	if (args.include_personality !== undefined) options.include_personality = args.include_personality;
+	if (args.include_traditions !== undefined) options.include_traditions = args.include_traditions;
+	if (args.include_pantry !== undefined) options.include_pantry = args.include_pantry;
+	if (args.include_equipment !== undefined) options.include_equipment = args.include_equipment;
+	if (typeof args.pantry_per_category_limit === "number") {
+		options.pantry_per_category_limit = args.pantry_per_category_limit;
+	}
+	if (typeof args.equipment_limit === "number") {
+		options.equipment_limit = args.equipment_limit;
+	}
+	if (typeof args.traditions_limit === "number") {
+		options.traditions_limit = args.traditions_limit;
+	}
+	return loadHouseholdSignals(env, householdId, options);
 }
 
 // ---------- helpers ----------

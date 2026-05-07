@@ -933,13 +933,15 @@ export async function eaten_entry(
 	//    never claimed anything (e.g. legacy cancel/repath) the count is 0.
 	const notes: string[] = [];
 	let releasedCount = 0;
-	try {
-		releasedCount = await releaseClaimsFor(deps.env, {
-			kind: "meal",
-			id: snapshot.meal_id,
-		});
-	} catch (err) {
-		notes.push(`equipment_release_failed:${err instanceof Error ? err.message : String(err)}`);
+	if (snapshot.household_id) {
+		try {
+			releasedCount = await releaseClaimsFor(deps.env, {
+				household_id: snapshot.household_id,
+				claim_for: { kind: "meal", id: snapshot.meal_id },
+			});
+		} catch (err) {
+			notes.push(`equipment_release_failed:${err instanceof Error ? err.message : String(err)}`);
+		}
 	}
 
 	const next = deps.now_ms + 72 * 60 * 60 * 1000;
@@ -1007,13 +1009,15 @@ export async function cancelled_entry(
 	//    cancellation: legacy stub releases still happen above.
 	const notes: string[] = [`cancelled: ${reason}`];
 	let householdReleased = 0;
-	try {
-		householdReleased = await releaseClaimsFor(deps.env, {
-			kind: "meal",
-			id: snapshot.meal_id,
-		});
-	} catch (err) {
-		notes.push(`household_release_failed:${err instanceof Error ? err.message : String(err)}`);
+	if (snapshot.household_id) {
+		try {
+			householdReleased = await releaseClaimsFor(deps.env, {
+				household_id: snapshot.household_id,
+				claim_for: { kind: "meal", id: snapshot.meal_id },
+			});
+		} catch (err) {
+			notes.push(`household_release_failed:${err instanceof Error ? err.message : String(err)}`);
+		}
 	}
 	const notifications: NotificationRow[] = [];
 	for (const member_id of deps.adults.adult_member_ids) {

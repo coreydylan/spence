@@ -215,12 +215,23 @@ async function loadTraitRow(
 	env: MiseGraphEnv,
 	household_id: string,
 	trait_name: TraitName,
+	member_id: string,
 ): Promise<Trait | null> {
+	// Phase D: PK now includes member_id. Match on the canonicalised
+	// member_id ('' for household-level) so per-member rows don't collide
+	// with the household-level cache. For household-level lookups we also
+	// pick up legacy NULL rows so the migration window doesn't lose data.
 	try {
-		const row = await env.DB.prepare(
-			`SELECT ${TRAIT_COLS} FROM mise_household_traits
-			 WHERE household_id = ? AND trait_name = ?`,
-		).bind(household_id, trait_name).first<TraitStorageRow>();
+		const sql = member_id === ""
+			? `SELECT ${TRAIT_COLS} FROM mise_household_traits
+				 WHERE household_id = ? AND trait_name = ?
+				   AND (member_id = ? OR member_id IS NULL)`
+			: `SELECT ${TRAIT_COLS} FROM mise_household_traits
+				 WHERE household_id = ? AND trait_name = ?
+				   AND member_id = ?`;
+		const row = await env.DB.prepare(sql)
+			.bind(household_id, trait_name, member_id)
+			.first<TraitStorageRow>();
 		if (!row) return null;
 		if (!isKnownTraitName(row.trait_name)) return null;
 		return {
@@ -277,11 +288,15 @@ export async function observeResponse(
 		}))
 		: inferTraitsFromObservation(kind, observation_text, input.context || {});
 
-	// Apply each delta via Phase A's Bayesian update.
+	// Apply each delta via Phase A's Bayesian update. Phase D fix: pin the
+	// trait write to the observation's member_id (or '' for household-level)
+	// so per-member trait spread can actually accumulate divergence —
+	// previously every observation collapsed onto the same row.
+	const observationMemberId = (input.member_id ?? "").trim();
 	const applied: TraitDelta[] = [];
 	for (const d of deltas) {
 		if (!isKnownTraitName(d.trait_name)) continue;
-		const existing = await loadTraitRow(env, household_id, d.trait_name);
+		const existing = await loadTraitRow(env, household_id, d.trait_name, observationMemberId);
 		const old_value = existing?.trait_value ?? 0.5;
 		const old_confidence = existing?.confidence ?? 0;
 		const evidence_count = (existing?.evidence_count ?? 0) + 1;
@@ -295,7 +310,7 @@ export async function observeResponse(
 			await persistTraitRow(env, {
 				household_id,
 				trait_name: d.trait_name,
-				member_id: input.member_id ?? null,
+				member_id: observationMemberId,
 				trait_value: updated.new_value,
 				confidence: updated.new_confidence,
 				last_evidence_at_ms: now,

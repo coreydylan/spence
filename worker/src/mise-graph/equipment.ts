@@ -6,6 +6,14 @@
 // reserve a window. Conflicts are detected via interval overlap:
 //   start < other.end  AND  end > other.start
 //
+// Per-household scoping
+// ---------------------
+// Every definition + claim is scoped by `household_id`. Two households can
+// each own a slug like `oven_main` without colliding — their definitions
+// are independent rows, and conflict-detection queries on claims always
+// filter by household_id so an A-household claim never blocks a B-household
+// claim on the same slug.
+//
 // Concurrency model
 // -----------------
 // Multiple sessions can race to claim the same equipment. We use a "check
@@ -40,21 +48,35 @@ import {
 import { beginTrace, completeTrace } from "./agent-trace";
 
 // ─── Schema migration ──────────────────────────────────────────────────────
+//
+// Both definitions and claims are scoped by (household_id, slug). On the
+// definitions table the PK is `(household_id, slug)` so two households can
+// each define `oven_main` without conflict. On the claims table household_id
+// is a column (claim ids are still globally unique) and every overlap-
+// detection query filters by it.
+//
+// `migrateEquipmentSchema` is idempotent for fresh installs (CREATE TABLE
+// IF NOT EXISTS). For instances that pre-date the per-household PK switch,
+// `migrateEquipmentSchemaWithRebuild` rebuilds the legacy table preserving
+// all rows. The /admin/migrate-wave-7 step runs the rebuild; per-call
+// hot-paths use the cheap CREATE-IF-NOT-EXISTS path.
 
 const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 	`CREATE TABLE IF NOT EXISTS mise_equipment_definitions (
-		slug TEXT PRIMARY KEY,
-		kind TEXT NOT NULL,
 		household_id TEXT NOT NULL,
+		slug TEXT NOT NULL,
+		kind TEXT NOT NULL,
 		exclusive INTEGER NOT NULL,
 		capacity INTEGER,
 		notes TEXT,
-		created_at_ms INTEGER NOT NULL
+		created_at_ms INTEGER NOT NULL,
+		PRIMARY KEY (household_id, slug)
 	)`,
 	`CREATE INDEX IF NOT EXISTS ix_equip_def_household
 		ON mise_equipment_definitions(household_id)`,
 	`CREATE TABLE IF NOT EXISTS mise_equipment_claims (
 		id TEXT PRIMARY KEY,
+		household_id TEXT NOT NULL,
 		equipment_slug TEXT NOT NULL,
 		claim_for_kind TEXT NOT NULL,
 		claim_for_id TEXT NOT NULL,
@@ -65,12 +87,116 @@ const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 		released_at_ms INTEGER,
 		created_at_ms INTEGER NOT NULL
 	)`,
+	`CREATE INDEX IF NOT EXISTS ix_equip_claims_hh_slug_window
+		ON mise_equipment_claims(household_id, equipment_slug, start_ts, end_ts)
+		WHERE status = 'held'`,
+	`CREATE INDEX IF NOT EXISTS ix_equip_claims_for
+		ON mise_equipment_claims(household_id, claim_for_kind, claim_for_id)
+		WHERE status = 'held'`,
 ];
 
 export async function migrateEquipmentSchema(env: MiseGraphEnv): Promise<void> {
 	for (const sql of SCHEMA_STATEMENTS) {
 		await env.DB.prepare(sql).run();
 	}
+}
+
+/**
+ * Rebuild the equipment tables to enforce the per-household PK on
+ * `mise_equipment_definitions` and add a household_id column to
+ * `mise_equipment_claims`. Idempotent — if the schema is already current,
+ * the rebuild is a no-op.
+ *
+ * Strategy:
+ *   1. Inspect both tables' schema via PRAGMA table_info.
+ *   2. If definitions PK is just `slug` (legacy), copy rows into a new
+ *      table with composite PK and swap.
+ *   3. If claims is missing `household_id`, add the column and backfill
+ *      from the matching definition row (claims always reference a slug
+ *      that exists in the definitions table).
+ *   4. Re-run CREATE TABLE IF NOT EXISTS so any missing index is added.
+ *
+ * Used by the /admin/migrate-wave-7 route on existing deployments.
+ */
+export async function migrateEquipmentSchemaWithRebuild(env: MiseGraphEnv): Promise<{
+	rebuilt_definitions: boolean;
+	rebuilt_claims: boolean;
+}> {
+	let rebuilt_definitions = false;
+	let rebuilt_claims = false;
+
+	// Step 0: ensure the tables exist at all (fresh install).
+	await migrateEquipmentSchema(env);
+
+	// Step 1: definitions PK migration. If the legacy table has just `slug`
+	// as PK we rebuild with the composite (household_id, slug) PK.
+	const defCols = await env.DB.prepare(
+		`PRAGMA table_info(mise_equipment_definitions)`,
+	).all<{ name: string; pk: number }>();
+	const defPkCols = (defCols.results || []).filter(c => c.pk > 0).map(c => c.name);
+	const defPkIsSlugOnly = defPkCols.length === 1 && defPkCols[0] === "slug";
+	if (defPkIsSlugOnly) {
+		// Rebuild path. Use a separate _new table to avoid relying on
+		// ALTER TABLE … RENAME COLUMN which D1 supports but is fussy.
+		await env.DB.prepare(`DROP TABLE IF EXISTS mise_equipment_definitions_new`).run();
+		await env.DB.prepare(
+			`CREATE TABLE mise_equipment_definitions_new (
+				household_id TEXT NOT NULL,
+				slug TEXT NOT NULL,
+				kind TEXT NOT NULL,
+				exclusive INTEGER NOT NULL,
+				capacity INTEGER,
+				notes TEXT,
+				created_at_ms INTEGER NOT NULL,
+				PRIMARY KEY (household_id, slug)
+			)`,
+		).run();
+		await env.DB.prepare(
+			`INSERT OR IGNORE INTO mise_equipment_definitions_new
+				(household_id, slug, kind, exclusive, capacity, notes, created_at_ms)
+			 SELECT household_id, slug, kind, exclusive, capacity, notes, created_at_ms
+			 FROM mise_equipment_definitions`,
+		).run();
+		await env.DB.prepare(`DROP TABLE mise_equipment_definitions`).run();
+		await env.DB.prepare(
+			`ALTER TABLE mise_equipment_definitions_new RENAME TO mise_equipment_definitions`,
+		).run();
+		rebuilt_definitions = true;
+	}
+
+	// Step 2: claims household_id column. ALTER TABLE … ADD COLUMN throws on
+	// duplicate column, which we treat as success (already migrated).
+	const claimCols = await env.DB.prepare(
+		`PRAGMA table_info(mise_equipment_claims)`,
+	).all<{ name: string }>();
+	const claimColNames = new Set((claimCols.results || []).map(c => c.name));
+	if (!claimColNames.has("household_id")) {
+		await env.DB.prepare(
+			`ALTER TABLE mise_equipment_claims ADD COLUMN household_id TEXT NOT NULL DEFAULT ''`,
+		).run();
+		// Backfill from definitions: each claim's slug should map to exactly
+		// one (household_id, slug) — but if the legacy table had duplicate
+		// slug rows across households, we can't disambiguate retroactively.
+		// In practice the only legacy rows are from a few test households,
+		// so the backfill is best-effort.
+		await env.DB.prepare(
+			`UPDATE mise_equipment_claims
+			 SET household_id = COALESCE(
+				(SELECT household_id FROM mise_equipment_definitions
+				 WHERE mise_equipment_definitions.slug = mise_equipment_claims.equipment_slug
+				 LIMIT 1),
+				''
+			 )
+			 WHERE household_id = ''`,
+		).run();
+		rebuilt_claims = true;
+	}
+
+	// Step 3: re-run CREATE TABLE IF NOT EXISTS / indexes so any missing
+	// piece (e.g. the composite-PK index) is added.
+	await migrateEquipmentSchema(env);
+
+	return { rebuilt_definitions, rebuilt_claims };
 }
 
 // ─── Definitions ────────────────────────────────────────────────────────────
@@ -95,12 +221,12 @@ export async function defineEquipment(
 	try {
 		await env.DB.prepare(
 			`INSERT OR REPLACE INTO mise_equipment_definitions
-				(slug, kind, household_id, exclusive, capacity, notes, created_at_ms)
+				(household_id, slug, kind, exclusive, capacity, notes, created_at_ms)
 			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		).bind(
+			def.household_id,
 			def.slug,
 			def.kind,
-			def.household_id,
 			def.exclusive ? 1 : 0,
 			def.capacity ?? null,
 			def.notes ?? null,
@@ -242,23 +368,31 @@ export async function ensureEquipmentDefined(
 	if (!household_id) throw new Error("ensureEquipmentDefined: household_id required");
 	if (!slug || !slug.trim()) throw new Error("ensureEquipmentDefined: slug required");
 	await migrateEquipmentSchema(env);
-	const existing = await getDefinition(env, slug);
+	const existing = await getDefinition(env, { household_id, slug });
 	if (existing) return existing;
 	const def = defaultEquipmentDefinition(slug, household_id);
 	await defineEquipment(env, def);
 	return def;
 }
 
-async function getDefinition(
+/**
+ * Look up a single equipment definition for `(household_id, slug)`. Returns
+ * null when the household has not defined that slug. Always household-scoped
+ * — callers that pass a slug without a household_id will get a clear error
+ * (no silent global-slug fallback).
+ */
+export async function getDefinition(
 	env: MiseGraphEnv,
-	slug: string,
+	args: { household_id: string; slug: string },
 ): Promise<EquipmentDefinition | null> {
+	if (!args.household_id) throw new Error("getDefinition: household_id required");
+	if (!args.slug) throw new Error("getDefinition: slug required");
 	const row = await env.DB.prepare(
 		`SELECT slug, kind, household_id, exclusive, capacity, notes
 		 FROM mise_equipment_definitions
-		 WHERE slug = ?
+		 WHERE household_id = ? AND slug = ?
 		 LIMIT 1`,
-	).bind(slug).first<{
+	).bind(args.household_id, args.slug).first<{
 		slug: string;
 		kind: string;
 		household_id: string;
@@ -287,6 +421,7 @@ export interface ClaimEquipmentArgs {
 
 interface RawClaimRow {
 	id: string;
+	household_id: string;
 	equipment_slug: string;
 	claim_for_kind: string;
 	claim_for_id: string;
@@ -301,6 +436,7 @@ interface RawClaimRow {
 function rowToClaim(row: RawClaimRow): EquipmentClaim {
 	return {
 		id: row.id,
+		household_id: row.household_id,
 		equipment_slug: row.equipment_slug,
 		claim_for: {
 			kind: row.claim_for_kind as EquipmentClaimKind,
@@ -317,20 +453,22 @@ function rowToClaim(row: RawClaimRow): EquipmentClaim {
 
 async function findOverlappingHeldClaims(
 	env: MiseGraphEnv,
+	household_id: string,
 	equipment_slug: string,
 	start_ts: number,
 	end_ts: number,
 ): Promise<EquipmentClaim[]> {
 	const rows = await env.DB.prepare(
-		`SELECT id, equipment_slug, claim_for_kind, claim_for_id,
+		`SELECT id, household_id, equipment_slug, claim_for_kind, claim_for_id,
 			start_ts, end_ts, status, claimed_by, released_at_ms, created_at_ms
 		 FROM mise_equipment_claims
-		 WHERE equipment_slug = ?
+		 WHERE household_id = ?
+		   AND equipment_slug = ?
 		   AND status = 'held'
 		   AND start_ts < ?
 		   AND end_ts > ?
 		 ORDER BY start_ts ASC`,
-	).bind(equipment_slug, end_ts, start_ts).all<RawClaimRow>();
+	).bind(household_id, equipment_slug, end_ts, start_ts).all<RawClaimRow>();
 	return (rows.results || []).map(rowToClaim);
 }
 
@@ -372,20 +510,26 @@ export async function claimEquipment(
 
 		for (const req of args.claims) {
 			validateClaimRequest(req);
-			const def = await getDefinition(env, req.equipment_slug);
+			const def = await getDefinition(env, {
+				household_id: args.household_id,
+				slug: req.equipment_slug,
+			});
 			// If equipment is undefined treat it as exclusive — it's a kitchen
 			// resource the household just hasn't catalogued yet, so we err on
 			// the safe side rather than letting overlapping claims through.
 			const exclusive = def ? def.exclusive : true;
 			const capacity = def && !def.exclusive ? Math.max(1, def.capacity ?? 1) : 1;
 
-			// Pull existing held claims that overlap [start_ts, end_ts).
+			// Pull existing held claims that overlap [start_ts, end_ts) for
+			// THIS household's slug. Other households' claims on the same slug
+			// are a different physical resource, so they never conflict here.
 			// Also include any "planned" claims earlier in this batch that
 			// target the same slug and overlap our window — without this,
 			// two requested claims for the same exclusive resource could
 			// both succeed within a single call.
 			const existing = await findOverlappingHeldClaims(
 				env,
+				args.household_id,
 				req.equipment_slug,
 				req.start_ts,
 				req.end_ts,
@@ -409,6 +553,7 @@ export async function claimEquipment(
 
 			const requestedClaim: EquipmentClaim = {
 				id: generateClaimId(),
+				household_id: args.household_id,
 				equipment_slug: req.equipment_slug,
 				claim_for: req.claim_for,
 				start_ts: req.start_ts,
@@ -445,12 +590,13 @@ export async function claimEquipment(
 				const stmts = planned.map(p =>
 					env.DB.prepare(
 						`INSERT INTO mise_equipment_claims
-							(id, equipment_slug, claim_for_kind, claim_for_id,
+							(id, household_id, equipment_slug, claim_for_kind, claim_for_id,
 							 start_ts, end_ts, status, claimed_by,
 							 released_at_ms, created_at_ms)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					).bind(
 						p.claim.id,
+						p.claim.household_id,
 						p.claim.equipment_slug,
 						p.claim.claim_for.kind,
 						p.claim.claim_for.id,
@@ -467,12 +613,13 @@ export async function claimEquipment(
 				for (const p of planned) {
 					await env.DB.prepare(
 						`INSERT INTO mise_equipment_claims
-							(id, equipment_slug, claim_for_kind, claim_for_id,
+							(id, household_id, equipment_slug, claim_for_kind, claim_for_id,
 							 start_ts, end_ts, status, claimed_by,
 							 released_at_ms, created_at_ms)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					).bind(
 						p.claim.id,
+						p.claim.household_id,
 						p.claim.equipment_slug,
 						p.claim.claim_for.kind,
 						p.claim.claim_for.id,
@@ -559,15 +706,20 @@ export async function releaseEquipment(
 
 export async function releaseClaimsFor(
 	env: MiseGraphEnv,
-	claim_for: { kind: string; id: string },
+	args: { household_id: string; claim_for: { kind: string; id: string } },
 ): Promise<number> {
+	if (!args || !args.household_id) {
+		throw new Error("releaseClaimsFor: household_id required");
+	}
+	const claim_for = args.claim_for;
 	if (!claim_for || !claim_for.kind || !claim_for.id) return 0;
 	await migrateEquipmentSchema(env);
 
 	const ctx = beginTrace({
 		tool_name: "equipment.releaseClaimsFor",
-		tool_args: { claim_for },
+		tool_args: { household_id: args.household_id, claim_for },
 		caller_kind: "system",
+		household_id: args.household_id,
 	});
 
 	try {
@@ -575,16 +727,22 @@ export async function releaseClaimsFor(
 		// where update meta.changes isn't reliably surfaced.
 		const open = await env.DB.prepare(
 			`SELECT id FROM mise_equipment_claims
-			 WHERE claim_for_kind = ? AND claim_for_id = ? AND status = 'held'`,
-		).bind(claim_for.kind, claim_for.id).all<{ id: string }>();
+			 WHERE household_id = ?
+			   AND claim_for_kind = ?
+			   AND claim_for_id = ?
+			   AND status = 'held'`,
+		).bind(args.household_id, claim_for.kind, claim_for.id).all<{ id: string }>();
 		const count = (open.results || []).length;
 
 		if (count > 0) {
 			await env.DB.prepare(
 				`UPDATE mise_equipment_claims
 				 SET status = 'released', released_at_ms = ?
-				 WHERE claim_for_kind = ? AND claim_for_id = ? AND status = 'held'`,
-			).bind(Date.now(), claim_for.kind, claim_for.id).run();
+				 WHERE household_id = ?
+				   AND claim_for_kind = ?
+				   AND claim_for_id = ?
+				   AND status = 'held'`,
+			).bind(Date.now(), args.household_id, claim_for.kind, claim_for.id).run();
 		}
 		await completeTrace(env, ctx, {
 			ok: true,
@@ -639,7 +797,10 @@ export async function findFreeWindow(
 	if (args.latest_ts <= args.earliest_ts) return null;
 
 	await migrateEquipmentSchema(env);
-	const def = await getDefinition(env, args.equipment_slug);
+	const def = await getDefinition(env, {
+		household_id: args.household_id,
+		slug: args.equipment_slug,
+	});
 	const exclusive = def ? def.exclusive : true;
 	const capacity = def && !def.exclusive ? Math.max(1, def.capacity ?? 1) : 1;
 	const durationMs = args.duration_min * 60_000;
@@ -649,6 +810,7 @@ export async function findFreeWindow(
 	// Pull all held claims overlapping the search range.
 	const claims = await findOverlappingHeldClaims(
 		env,
+		args.household_id,
 		args.equipment_slug,
 		args.earliest_ts,
 		args.latest_ts,
@@ -720,11 +882,15 @@ export async function getEquipmentLoad(
 	}
 	await migrateEquipmentSchema(env);
 
-	const def = await getDefinition(env, args.equipment_slug);
+	const def = await getDefinition(env, {
+		household_id: args.household_id,
+		slug: args.equipment_slug,
+	});
 	const capacity = def && !def.exclusive ? Math.max(1, def.capacity ?? 1) : 1;
 
 	const claims = await findOverlappingHeldClaims(
 		env,
+		args.household_id,
 		args.equipment_slug,
 		args.window_start_ts,
 		args.window_end_ts,

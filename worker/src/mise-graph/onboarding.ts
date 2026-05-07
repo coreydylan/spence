@@ -36,6 +36,7 @@ import {
 	type QuestionKind,
 	type TraitName,
 } from "./onboarding-questions";
+import { computeEngagementSignal } from "./onboarding-scheduler";
 
 const TIER_COUNT = 5; // 0..4 — Phase A only ships 0+1, but completion_pct
                       // divides by 5 so the UI bar makes sense long-term.
@@ -377,12 +378,34 @@ export async function statusOnboarding(
 	const traits = await listTraits(env, household_id);
 	const next = await pickNextQuestion(env, household_id, state);
 	const completion_pct = computeCompletionPct(state);
+
+	// Calibration nudge — engagement signal MUST agree across callers. Phase
+	// C's `household_get_next_question` recomputes live from `recent_responses`
+	// while `household_onboarding_status` was returning the cached
+	// `state.engagement_signal` field, which only updates when the daily brief
+	// fires. Same household within the same minute could thus see 0.5 vs 1.0.
+	//
+	// Fix: status recomputes live AND persists the fresh value back into the
+	// state row so the cache stays warm for callers that don't recompute.
+	const recent = await listResponses(env, household_id);
+	const liveSignal = computeEngagementSignal(recent, Date.now());
+	const liveSignalRounded = round3(liveSignal);
+	if (Math.abs((state.engagement_signal ?? 1.0) - liveSignalRounded) > 1e-6) {
+		state.engagement_signal = liveSignalRounded;
+		state.updated_at_ms = Date.now();
+		try {
+			await persistState(env, state);
+		} catch {
+			// Cache write is best-effort; live value is still returned.
+		}
+	}
+
 	return {
 		state: rowToState(state),
 		traits,
 		next_question: next,
 		completion_pct,
-		engagement_signal: state.engagement_signal,
+		engagement_signal: liveSignalRounded,
 	};
 }
 
@@ -419,6 +442,115 @@ export function applyTraitDelta(input: ApplyTraitDeltaInput): ApplyTraitDeltaRes
 	};
 }
 
+// ─── Persistence helper (Calibration Phase D) ──────────────────────────────
+//
+// `applyTraitDelta` (above) is a pure math fn. Callers need to load → apply
+// → store, threading `member_id` through. Before this helper, every callsite
+// duplicated the load/apply/store dance and hardcoded `member_id=null`,
+// which silently collapsed multi-member trait spread (Fix #4).
+//
+// `applyTraitDeltaForHousehold` is the single write-path. Pass `member_id`
+// to record a per-member trait; omit (or pass empty string) to write a
+// household-level row. Both forms coexist because the schema PK now
+// includes `member_id` (NULLs normalised to '').
+
+export interface ApplyTraitDeltaWriteOpts {
+	member_id?: string | null;
+	now_ms?: number;
+}
+
+export interface ApplyTraitDeltaWriteResult {
+	trait_name: TraitName;
+	member_id: string;
+	prev_value: number;
+	prev_confidence: number;
+	new_value: number;
+	new_confidence: number;
+	evidence_count: number;
+	written: boolean;
+}
+
+export async function applyTraitDeltaForHousehold(
+	env: MiseGraphEnv,
+	household_id: string,
+	trait_name: TraitName,
+	delta_value: number,
+	delta_confidence: number,
+	opts: ApplyTraitDeltaWriteOpts = {},
+): Promise<ApplyTraitDeltaWriteResult> {
+	if (!isKnownTraitName(trait_name)) {
+		throw new Error(`applyTraitDeltaForHousehold: unknown trait_name '${trait_name}'`);
+	}
+	const member_id = normaliseMemberId(opts.member_id);
+	const now = typeof opts.now_ms === "number" && Number.isFinite(opts.now_ms) ? opts.now_ms : Date.now();
+
+	const existing = await loadTraitForMember(env, household_id, trait_name, member_id);
+	const old_value = existing?.trait_value ?? 0.5;
+	const old_confidence = existing?.confidence ?? 0;
+	const evidence_count = (existing?.evidence_count ?? 0) + 1;
+	const updated = applyTraitDelta({ old_value, old_confidence, delta_value, delta_confidence });
+
+	let written = false;
+	try {
+		await persistTrait(env, {
+			household_id,
+			trait_name,
+			member_id,
+			trait_value: updated.new_value,
+			confidence: updated.new_confidence,
+			last_evidence_at_ms: now,
+			evidence_count,
+		});
+		written = true;
+	} catch {
+		// Trait write failure shouldn't crash the caller; the math result
+		// still gets returned for log purposes.
+	}
+
+	return {
+		trait_name,
+		member_id,
+		prev_value: round3(old_value),
+		prev_confidence: round3(old_confidence),
+		new_value: updated.new_value,
+		new_confidence: updated.new_confidence,
+		evidence_count,
+		written,
+	};
+}
+
+function normaliseMemberId(raw: string | null | undefined): string {
+	if (raw === null || raw === undefined) return "";
+	const t = String(raw).trim();
+	return t;
+}
+
+async function loadTraitForMember(
+	env: MiseGraphEnv,
+	household_id: string,
+	trait_name: TraitName,
+	member_id: string,
+): Promise<Trait | null> {
+	// Phase D: PK now includes member_id. For the household-level lookup
+	// we also accept legacy NULL rows so the migration window doesn't drop
+	// pre-Phase-D writes.
+	try {
+		const sql = member_id === ""
+			? `SELECT ${TRAIT_COLS} FROM mise_household_traits
+				 WHERE household_id = ? AND trait_name = ?
+				   AND (member_id = ? OR member_id IS NULL)`
+			: `SELECT ${TRAIT_COLS} FROM mise_household_traits
+				 WHERE household_id = ? AND trait_name = ?
+				   AND member_id = ?`;
+		const row = await env.DB.prepare(sql)
+			.bind(household_id, trait_name, member_id)
+			.first<TraitRow>();
+		return row ? rowToTrait(row) : null;
+	} catch {
+		return null;
+	}
+}
+
 async function applyQuestionTraits(
 	env: MiseGraphEnv,
 	household_id: string,
@@ -452,7 +584,8 @@ async function applyQuestionTraits(
 		await persistTrait(env, {
 			household_id,
 			trait_name: rule.trait_name,
-			member_id: null,
+			// Phase D PK now includes member_id; '' = household-level row.
+			member_id: "",
 			trait_value: updated.new_value,
 			confidence: updated.new_confidence,
 			last_evidence_at_ms: now,
@@ -750,10 +883,13 @@ async function loadTrait(
 	household_id: string,
 	trait_name: TraitName,
 ): Promise<Trait | null> {
+	// Household-level row only — per-member rows live alongside it now that
+	// the PK includes member_id. Match both legacy NULLs and new '' rows.
 	try {
 		const row = await env.DB.prepare(
 			`SELECT ${TRAIT_COLS} FROM mise_household_traits
-			 WHERE household_id = ? AND trait_name = ?`,
+			 WHERE household_id = ? AND trait_name = ?
+			   AND (member_id = '' OR member_id IS NULL)`,
 		).bind(household_id, trait_name).first<TraitRow>();
 		return row ? rowToTrait(row) : null;
 	} catch {

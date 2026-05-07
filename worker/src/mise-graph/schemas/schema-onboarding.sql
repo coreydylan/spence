@@ -52,12 +52,12 @@ CREATE INDEX IF NOT EXISTS ix_onboarding_responses_household
 CREATE TABLE IF NOT EXISTS mise_household_traits (
 	household_id TEXT NOT NULL,
 	trait_name TEXT NOT NULL,
-	member_id TEXT,
+	member_id TEXT NOT NULL DEFAULT '',
 	trait_value REAL NOT NULL DEFAULT 0.5,
 	confidence REAL NOT NULL DEFAULT 0,
 	last_evidence_at_ms INTEGER NOT NULL,
 	evidence_count INTEGER NOT NULL DEFAULT 0,
-	PRIMARY KEY (household_id, trait_name)
+	PRIMARY KEY (household_id, trait_name, member_id)
 );
 
 -- ---------------------------------------------------------------------------

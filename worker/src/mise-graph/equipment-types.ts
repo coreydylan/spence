@@ -39,6 +39,7 @@ export type EquipmentClaimStatus = "held" | "released" | "expired";
 
 export interface EquipmentClaim {
 	id: string;              // ulid-like
+	household_id: string;    // scopes the slug — every household's "oven_main" is its own row
 	equipment_slug: string;
 	claim_for: EquipmentClaimRef;
 	start_ts: number;        // epoch_ms

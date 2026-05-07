@@ -4,6 +4,7 @@ import { handleReplanRequest, handleReplanLogRequest } from "./mise-graph/replan
 import { migrateHouseholdMemorySchema } from "./mise-graph/admin-household-memory";
 import { migrateCalendarSchema } from "./mise-graph/calendar-tools";
 import { runDailyCheckinForToday, handleDailyCheckin } from "./mise-graph/cron-daily-checkin";
+import { runDailyMorningBriefSweep } from "./mise-graph/cron-runner";
 import type { MeshClaudeEnv } from "./mise-graph/llm-bridge";
 import type { MiseGraphEnv } from "./mise-graph/types";
 import { householdAgentName, planAgentName } from "./mise-graph/agents/base";
@@ -16,7 +17,7 @@ import {
 } from "./mise-graph/schemas/migrations";
 import { migrateMealAgentSchemas } from "./mise-graph/agents/d1-schemas";
 import { migrateTaskGraphSchema } from "./mise-graph/task-graph";
-import { migrateEquipmentSchema } from "./mise-graph/equipment";
+import { migrateEquipmentSchema, migrateEquipmentSchemaWithRebuild } from "./mise-graph/equipment";
 import {
 	cookAgentName as cookName,
 	householdAgentName as householdName,
@@ -264,7 +265,18 @@ export default {
 				{ name: "shop_reminders", fn: () => migrateShopRemindersSchema(env) },
 				{ name: "meal_agent", fn: () => migrateMealAgentSchemas(env) },
 				{ name: "task_graphs", fn: () => migrateTaskGraphSchema(env).then(() => ({ migrated: ["mise_task_graphs"] })) },
-				{ name: "equipment", fn: () => migrateEquipmentSchema(env).then(() => ({ migrated: ["mise_equipment_definitions", "mise_equipment_claims"] })) },
+				{ name: "equipment", fn: async () => {
+					// Run the rebuild path on existing deployments — converts the
+					// legacy `slug TEXT PRIMARY KEY` definitions table to the
+					// per-household composite PK, and adds household_id to the
+					// claims table. Idempotent on fresh installs.
+					const rebuilt = await migrateEquipmentSchemaWithRebuild(env);
+					await migrateEquipmentSchema(env);
+					return {
+						migrated: ["mise_equipment_definitions", "mise_equipment_claims"],
+						rebuilt,
+					};
+				} },
 			];
 			for (const step of steps) {
 				try {
@@ -394,13 +406,37 @@ export default {
 		});
 	},
 
-	// Scheduled handler invoked by Cloudflare Cron Trigger (when [[triggers]] enabled).
-	async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-		ctx.waitUntil(handleDailyCheckin(env as Env & Partial<MeshClaudeEnv>).then(result => {
-			console.log("[cron] daily check-in:", JSON.stringify(result));
-		}).catch(err => {
-			console.error("[cron] daily check-in failed:", err);
-		}));
+	// Scheduled handler invoked by Cloudflare Cron Trigger.
+	//
+	// Wave 7F runs TWO sweeps per fire:
+	//   1. runDailyMorningBriefSweep — fans out to every active household's
+	//      HouseholdAgent /daily-brief route. This is the primary brief in
+	//      the entity-DO architecture.
+	//   2. handleDailyCheckin — legacy per-plan brief (kept until consumers
+	//      migrate to mise_household_agent_briefs).
+	//
+	// Both run via ctx.waitUntil so the cron returns immediately. Errors are
+	// per-household / per-plan and never abort the other sweep.
+	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+		const fireMs = controller.scheduledTime || Date.now();
+		ctx.waitUntil(
+			runDailyMorningBriefSweep(env, fireMs)
+				.then(result => {
+					console.log("[cron] morning-brief sweep:", JSON.stringify(result));
+				})
+				.catch(err => {
+					console.error("[cron] morning-brief sweep failed:", err);
+				}),
+		);
+		ctx.waitUntil(
+			handleDailyCheckin(env as Env & Partial<MeshClaudeEnv>)
+				.then(result => {
+					console.log("[cron] daily check-in (legacy):", JSON.stringify(result));
+				})
+				.catch(err => {
+					console.error("[cron] daily check-in (legacy) failed:", err);
+				}),
+		);
 	},
 };
 

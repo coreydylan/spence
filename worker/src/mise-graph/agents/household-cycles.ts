@@ -381,6 +381,53 @@ export async function persistMorningBrief(
 	};
 }
 
+/**
+ * Load the brief written for a specific (household_id, for_date) pair, if any.
+ * Returns null when the brief hasn't been generated yet for that date — the
+ * caller (Wave 7F cron + read tool) treats null as "no_brief" and surfaces
+ * accordingly.
+ */
+export async function loadBriefForDate(
+	env: MiseGraphEnv,
+	household_id: string,
+	for_date: string,
+): Promise<MorningBriefResult | null> {
+	let row: {
+		id: string;
+		household_id: string;
+		for_date: string;
+		weather_summary_json: string | null;
+		calendar_windows_json: string | null;
+		plan_health_json: string | null;
+		suggestions_json: string | null;
+		created_at_ms: number;
+	} | null = null;
+	try {
+		row = await env.DB.prepare(
+			`SELECT id, household_id, for_date,
+			        weather_summary_json, calendar_windows_json,
+			        plan_health_json, suggestions_json, created_at_ms
+			 FROM mise_household_agent_briefs
+			 WHERE household_id = ? AND for_date = ?
+			 ORDER BY created_at_ms DESC
+			 LIMIT 1`,
+		).bind(household_id, for_date).first();
+	} catch {
+		row = null;
+	}
+	if (!row) return null;
+	return {
+		id: row.id,
+		household_id: row.household_id,
+		for_date: row.for_date,
+		weather: row.weather_summary_json ? safeParseJson<WeatherSummary>(row.weather_summary_json) : null,
+		calendar: row.calendar_windows_json ? safeParseJson<CalendarWindow[]>(row.calendar_windows_json) ?? [] : [],
+		plan_health: row.plan_health_json ? safeParseJson<PlanHealthSnapshot[]>(row.plan_health_json) ?? [] : [],
+		suggestions: row.suggestions_json ? safeParseJson<DailyBriefSuggestion[]>(row.suggestions_json) ?? [] : [],
+		created_at_ms: row.created_at_ms,
+	};
+}
+
 export async function loadLatestBrief(
 	env: MiseGraphEnv,
 	household_id: string,

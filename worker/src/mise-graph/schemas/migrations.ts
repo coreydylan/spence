@@ -266,16 +266,20 @@ const ONBOARDING_MIGRATIONS: ReadonlyArray<MigrationStmt> = [
 			ON mise_onboarding_responses(household_id, asked_at_ms DESC)`,
 	},
 	{
+		// Phase D calibration: PK now includes member_id so (household_id,
+		// trait_name) can have multiple rows — one household-level row
+		// (member_id='') plus one per member. Writers normalise NULL→'' so
+		// uniqueness works in real SQLite (NULLs in PK are treated distinct).
 		table: "mise_household_traits",
 		sql: `CREATE TABLE IF NOT EXISTS mise_household_traits (
 			household_id TEXT NOT NULL,
 			trait_name TEXT NOT NULL,
-			member_id TEXT,
+			member_id TEXT NOT NULL DEFAULT '',
 			trait_value REAL NOT NULL DEFAULT 0.5,
 			confidence REAL NOT NULL DEFAULT 0,
 			last_evidence_at_ms INTEGER NOT NULL,
 			evidence_count INTEGER NOT NULL DEFAULT 0,
-			PRIMARY KEY (household_id, trait_name)
+			PRIMARY KEY (household_id, trait_name, member_id)
 		)`,
 	},
 	{
@@ -313,7 +317,34 @@ const ONBOARDING_PROFILE_COLUMNS: ReadonlyArray<{ name: string; sql: string }> =
 		name: "pantry_intake_mode",
 		sql: `ALTER TABLE mise_household_profiles ADD COLUMN pantry_intake_mode TEXT`,
 	},
+	// Wave 7F — per-household IANA timezone. Read by the morning-brief cron
+	// so each household's brief formats times in its local zone. The cron
+	// itself still fires at 14:00 UTC for all households in Phase 1; Phase
+	// 2 will shard by timezone to deliver at local 7am.
+	{
+		name: "timezone",
+		sql: `ALTER TABLE mise_household_profiles ADD COLUMN timezone TEXT`,
+	},
 ];
+
+// Convenience: dedicated migration that ONLY adds the timezone column. Useful
+// when the onboarding schema migration has already been run and we just want
+// to pick up the new column without re-running everything else. Same
+// idempotent try/catch pattern.
+export async function migrateHouseholdTimezoneColumn(
+	env: MiseGraphEnv,
+): Promise<{ altered: string[] }> {
+	const altered: string[] = [];
+	try {
+		await env.DB.prepare(
+			`ALTER TABLE mise_household_profiles ADD COLUMN timezone TEXT`,
+		).run();
+		altered.push("timezone");
+	} catch {
+		// Already added (or base table missing) — non-fatal.
+	}
+	return { altered };
+}
 
 export async function migrateOnboardingSchema(
 	env: MiseGraphEnv,

@@ -129,6 +129,7 @@ interface EquipmentDefRow {
 
 interface EquipmentClaimRow {
 	id: string;
+	household_id: string;
 	equipment_slug: string;
 	claim_for_kind: string;
 	claim_for_id: string;
@@ -141,6 +142,9 @@ interface EquipmentClaimRow {
 }
 
 export class EquipmentFakeD1 {
+	// Definitions are keyed by `${household_id}::${slug}` so two households
+	// can each define the same slug without colliding — mirrors the real
+	// composite (household_id, slug) PK.
 	definitions = new Map<string, EquipmentDefRow>();
 	claims = new Map<string, EquipmentClaimRow>();
 	agentTraces: AgentTraceRow[] = [];
@@ -162,6 +166,10 @@ export class EquipmentFakeD1 {
 	}
 }
 
+function defKey(household_id: string, slug: string): string {
+	return `${household_id}::${slug}`;
+}
+
 class EquipmentFakeStatement {
 	private bindings: unknown[] = [];
 
@@ -177,11 +185,14 @@ class EquipmentFakeStatement {
 			return { success: true, meta: { changes: 0 } };
 		}
 		if (/INSERT\s+OR\s+REPLACE\s+INTO\s+mise_equipment_definitions/i.test(this.sql)) {
+			// Bindings: (household_id, slug, kind, exclusive, capacity, notes, created_at_ms)
 			const b = this.bindings;
-			this.db.definitions.set(String(b[0]), {
-				slug: String(b[0]),
-				kind: String(b[1]),
-				household_id: String(b[2]),
+			const household_id = String(b[0]);
+			const slug = String(b[1]);
+			this.db.definitions.set(defKey(household_id, slug), {
+				slug,
+				kind: String(b[2]),
+				household_id,
 				exclusive: Number(b[3]),
 				capacity: b[4] === null ? null : Number(b[4]),
 				notes: b[5] === null ? null : String(b[5]),
@@ -190,18 +201,22 @@ class EquipmentFakeStatement {
 			return { success: true, meta: { changes: 1 } };
 		}
 		if (/INSERT\s+INTO\s+mise_equipment_claims/i.test(this.sql)) {
+			// Bindings: (id, household_id, equipment_slug, claim_for_kind,
+			//           claim_for_id, start_ts, end_ts, status, claimed_by,
+			//           released_at_ms, created_at_ms)
 			const b = this.bindings;
 			this.db.claims.set(String(b[0]), {
 				id: String(b[0]),
-				equipment_slug: String(b[1]),
-				claim_for_kind: String(b[2]),
-				claim_for_id: String(b[3]),
-				start_ts: Number(b[4]),
-				end_ts: Number(b[5]),
-				status: String(b[6]),
-				claimed_by: String(b[7]),
-				released_at_ms: b[8] === null || b[8] === undefined ? null : Number(b[8]),
-				created_at_ms: Number(b[9]),
+				household_id: String(b[1]),
+				equipment_slug: String(b[2]),
+				claim_for_kind: String(b[3]),
+				claim_for_id: String(b[4]),
+				start_ts: Number(b[5]),
+				end_ts: Number(b[6]),
+				status: String(b[7]),
+				claimed_by: String(b[8]),
+				released_at_ms: b[9] === null || b[9] === undefined ? null : Number(b[9]),
+				created_at_ms: Number(b[10]),
 			});
 			return { success: true, meta: { changes: 1 } };
 		}
@@ -219,15 +234,21 @@ class EquipmentFakeStatement {
 			}
 			return { success: true, meta: { changes } };
 		}
-		// UPDATE all claims for a claim_for kind/id.
-		if (/UPDATE\s+mise_equipment_claims\s+SET[\s\S]+WHERE\s+claim_for_kind\s*=\s*\?\s+AND\s+claim_for_id\s*=\s*\?\s+AND\s+status\s*=\s*'held'/i.test(this.sql)) {
+		// UPDATE all claims for a household + claim_for kind/id.
+		if (/UPDATE\s+mise_equipment_claims\s+SET[\s\S]+WHERE\s+household_id\s*=\s*\?[\s\S]+claim_for_kind\s*=\s*\?[\s\S]+claim_for_id\s*=\s*\?[\s\S]+status\s*=\s*'held'/i.test(this.sql)) {
 			const b = this.bindings;
 			const released_at = Number(b[0]);
-			const kind = String(b[1]);
-			const id = String(b[2]);
+			const household_id = String(b[1]);
+			const kind = String(b[2]);
+			const id = String(b[3]);
 			let changes = 0;
 			for (const row of this.db.claims.values()) {
-				if (row.claim_for_kind === kind && row.claim_for_id === id && row.status === "held") {
+				if (
+					row.household_id === household_id &&
+					row.claim_for_kind === kind &&
+					row.claim_for_id === id &&
+					row.status === "held"
+				) {
 					row.status = "released";
 					row.released_at_ms = released_at;
 					changes++;
@@ -247,10 +268,21 @@ class EquipmentFakeStatement {
 	}
 
 	async first<T = unknown>(): Promise<T | null> {
-		if (/FROM\s+mise_equipment_definitions/i.test(this.sql)) {
-			const slug = String(this.bindings[0]);
-			const row = this.db.definitions.get(slug);
+		// getDefinition: SELECT … FROM mise_equipment_definitions
+		// WHERE household_id = ? AND slug = ?
+		if (/FROM\s+mise_equipment_definitions[\s\S]+WHERE\s+household_id\s*=\s*\?[\s\S]+slug\s*=\s*\?/i.test(this.sql)) {
+			const household_id = String(this.bindings[0]);
+			const slug = String(this.bindings[1]);
+			const row = this.db.definitions.get(defKey(household_id, slug));
 			return (row || null) as T | null;
+		}
+		// onboarding-bulk.readEquipmentSlugExists: SELECT slug FROM …
+		// WHERE household_id = ? AND slug = ? LIMIT 1
+		if (/SELECT\s+slug\s+FROM\s+mise_equipment_definitions[\s\S]+WHERE\s+household_id\s*=\s*\?[\s\S]+slug\s*=\s*\?/i.test(this.sql)) {
+			const household_id = String(this.bindings[0]);
+			const slug = String(this.bindings[1]);
+			const row = this.db.definitions.get(defKey(household_id, slug));
+			return (row ? { slug: row.slug } : null) as T | null;
 		}
 		return null;
 	}
@@ -264,13 +296,15 @@ class EquipmentFakeStatement {
 				.sort((a, b) => a.slug.localeCompare(b.slug));
 			return { results: matched as unknown as T[] };
 		}
-		// findOverlappingHeldClaims: SELECT … WHERE equipment_slug=? AND status='held' AND start_ts < ? AND end_ts > ?
-		if (/FROM\s+mise_equipment_claims[\s\S]+equipment_slug\s*=\s*\?[\s\S]+start_ts\s*<\s*\?[\s\S]+end_ts\s*>\s*\?/i.test(this.sql)) {
-			const slug = String(this.bindings[0]);
-			const upperEnd = Number(this.bindings[1]);   // bound for start_ts < ?
-			const lowerStart = Number(this.bindings[2]); // bound for end_ts > ?
+		// findOverlappingHeldClaims: SELECT … WHERE household_id=? AND equipment_slug=? AND status='held' AND start_ts < ? AND end_ts > ?
+		if (/FROM\s+mise_equipment_claims[\s\S]+household_id\s*=\s*\?[\s\S]+equipment_slug\s*=\s*\?[\s\S]+start_ts\s*<\s*\?[\s\S]+end_ts\s*>\s*\?/i.test(this.sql)) {
+			const household_id = String(this.bindings[0]);
+			const slug = String(this.bindings[1]);
+			const upperEnd = Number(this.bindings[2]);   // bound for start_ts < ?
+			const lowerStart = Number(this.bindings[3]); // bound for end_ts > ?
 			const matched = [...this.db.claims.values()]
 				.filter(r =>
+					r.household_id === household_id &&
 					r.equipment_slug === slug &&
 					r.status === "held" &&
 					r.start_ts < upperEnd &&
@@ -279,12 +313,19 @@ class EquipmentFakeStatement {
 				.sort((a, b) => a.start_ts - b.start_ts);
 			return { results: matched as unknown as T[] };
 		}
-		// releaseClaimsFor read-back: SELECT id FROM mise_equipment_claims WHERE claim_for_kind=? AND claim_for_id=? AND status='held'
-		if (/FROM\s+mise_equipment_claims[\s\S]+claim_for_kind\s*=\s*\?[\s\S]+claim_for_id\s*=\s*\?[\s\S]+status\s*=\s*'held'/i.test(this.sql)) {
-			const kind = String(this.bindings[0]);
-			const id = String(this.bindings[1]);
+		// releaseClaimsFor read-back: SELECT id FROM mise_equipment_claims
+		// WHERE household_id=? AND claim_for_kind=? AND claim_for_id=? AND status='held'
+		if (/FROM\s+mise_equipment_claims[\s\S]+household_id\s*=\s*\?[\s\S]+claim_for_kind\s*=\s*\?[\s\S]+claim_for_id\s*=\s*\?[\s\S]+status\s*=\s*'held'/i.test(this.sql)) {
+			const household_id = String(this.bindings[0]);
+			const kind = String(this.bindings[1]);
+			const id = String(this.bindings[2]);
 			const matched = [...this.db.claims.values()]
-				.filter(r => r.claim_for_kind === kind && r.claim_for_id === id && r.status === "held")
+				.filter(r =>
+					r.household_id === household_id &&
+					r.claim_for_kind === kind &&
+					r.claim_for_id === id &&
+					r.status === "held",
+				)
 				.map(r => ({ id: r.id }));
 			return { results: matched as unknown as T[] };
 		}
