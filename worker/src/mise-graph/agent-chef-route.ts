@@ -94,10 +94,17 @@ export function buildSystemPrompt(
 	const personality =
 		signals?.personality?.summary ?? "Still calibrating; no personality signal yet.";
 
+	// Personality dimensions — only the ones with non-trivial confidence.
+	// Helps Claude *use* the dimensions rather than just see a summary string.
+	const dimensions = (signals?.personality?.dimensions ?? [])
+		.filter(d => d.confidence >= 0.15 && (d.value <= 0.3 || d.value >= 0.7))
+		.map(d => `- ${d.trait_name}: ${d.label} (value ${d.value.toFixed(2)}, confidence ${d.confidence.toFixed(2)})`)
+		.join("\n");
+
 	const traditions =
 		signals?.traditions && signals.traditions.length > 0
 			? signals.traditions
-				.slice(0, 4)
+				.slice(0, 8)
 				.map(t => `- ${t.name} (${t.cadence})${t.description ? ": " + t.description : ""}`)
 				.join("\n")
 			: "(none recorded yet)";
@@ -110,7 +117,30 @@ export function buildSystemPrompt(
 		].join(", ") || "(none)"
 		: "(unknown — onboarding incomplete)";
 
-	const equipment = signals?.equipment_available?.slice(0, 8).join(", ") || "(unknown)";
+	// Equipment: render every slug the household has so the chef knows what
+	// they can cook with. Empty state is "(none recorded)" not "(unknown)" —
+	// don't invite hallucinations about a stocked kitchen.
+	const equipment =
+		signals?.equipment_available && signals.equipment_available.length > 0
+			? signals.equipment_available.slice(0, 24).join(", ")
+			: "(none recorded yet)";
+
+	// Pantry: this was the missing piece — Claude was hallucinating "I don't
+	// have a pantry inventory" because the system prompt didn't include it.
+	// Render every category with its items so the chef can plan from what's
+	// actually on hand.
+	const pantry =
+		signals?.pantry_top && signals.pantry_top.length > 0
+			? signals.pantry_top
+				.map(g => `- ${g.category}: ${g.items.join(", ")}`)
+				.join("\n")
+			: "(no pantry items recorded yet)";
+
+	// Member-spread guidance: if traits diverge across members, surface the
+	// description so Claude can reason about it ("alternate dishes").
+	const spread = signals?.member_spread_guidance
+		? `\nMulti-member trait spread: ${signals.member_spread_guidance}`
+		: "";
 
 	const onboardingNote =
 		status?.onboarding && !status.onboarding.tier_0_done
@@ -123,12 +153,32 @@ export function buildSystemPrompt(
 		"You are Spence, a chef-of-staff agent embedded in a household's life.",
 		"You speak warmly, briefly, in second person — like a friend who happens to know what's in the fridge.",
 		"Default to one or two short sentences. The user is at the stove or on their phone.",
-		"Ground every recommendation in the household's signals below — never invent equipment, ingredients, or traditions.",
+		"Ground every recommendation in the household's signals below — never invent equipment, ingredients, or traditions. If a section says \"(none recorded yet)\" then it's truly empty — say so plainly, don't make up an excuse.",
 		"",
-		`Household personality: ${personality}`,
-		`Traditions:\n${traditions}`,
-		`Avoidances: ${avoidances}`,
-		`Equipment available: ${equipment}`,
+		"# Household signals (use these — never claim you don't have them)",
+		"",
+		`## Personality`,
+		personality,
+		dimensions ? `\nDecisive dimensions:\n${dimensions}` : "",
+		"",
+		`## Traditions`,
+		traditions,
+		"",
+		`## Pantry on hand`,
+		pantry,
+		"",
+		`## Equipment in this kitchen`,
+		equipment,
+		"",
+		`## Avoidances`,
+		avoidances,
+		spread,
+		"",
+		"# How to answer",
+		"- If asked about pantry, equipment, or traditions, READ from the sections above. Do not say \"I don't have that on file\" if the section has data.",
+		"- When proposing meals, prefer items already in the pantry over shopping spikes.",
+		"- Honor traditions when the date/cadence matches.",
+		"- Match the household's personality (quick vs project, comfort vs adventure, etc.) when picking complexity.",
 		"",
 		"Tools available to the agent runtime (you don't call these directly — the runtime does):",
 		toolList,
