@@ -25,7 +25,7 @@
 // The auth layer slots into `getConnectionTags` (called *before* onConnect)
 // so a token failure can return a closed socket without firing onConnect.
 
-import { Agent } from "agents";
+import { Agent, type FiberRecoveryContext } from "agents";
 import {
 	beginTrace,
 	completeTrace,
@@ -39,6 +39,8 @@ import {
 	type BrigadeEvent,
 	type BrigadeEventKind,
 	type BrigadeMessage,
+	type BrigadeSchedulerInput,
+	type BrigadeSchedulerOutput,
 	type BrigadeStatus,
 	type CookingLeadState,
 	type GrantTokenResponse,
@@ -77,6 +79,18 @@ const SUB_ID_MEMBER  = "__brigade_member_id";
 
 const SCHEDULER_TICK_MS = 10_000;
 const SESSION_HARD_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4h
+
+/**
+ * Phase 4 — fiber checkpoint snapshot for the scheduler tick. Tracks
+ * whether a tick had built its input, run the heuristic, and applied
+ * the resulting assignments before the worker died.
+ */
+export interface SchedulerTickFiberSnapshot {
+	now: number;
+	input?: BrigadeSchedulerInput;
+	output?: BrigadeSchedulerOutput;
+	applied?: boolean;
+}
 
 const INITIAL_STATE: CookingLeadState = {
 	cook_session_id: "",
@@ -1075,13 +1089,39 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 
 	async onSchedulerTick(): Promise<void> {
 		if (this.state.status !== "active") return;
+		// Phase 4 — wrap each scheduler tick in a Fiber so a worker death
+		// mid-tick doesn't leave half-applied assignments. Stash schedule:
+		//   1. After buildSchedulerInput → `{ now, input }`
+		//   2. After tickScheduler        → `{ now, input, output }`
+		//   3. After applySchedulerOutput → `{ now, input, output, applied: true }`
+		// Recovery: replay applySchedulerOutput (idempotent on PK).
+		try {
+			await this.runFiber("scheduler_tick", async (fiberCtx) => {
+				await this.runSchedulerTickFiber(fiberCtx);
+			});
+		} catch (err) {
+			console.warn(`[cooking-lead-agent] scheduler_tick fiber failed:`, err);
+			// Even on failure, re-arm the next tick so the cadence survives.
+			await this.schedule(
+				new Date(Date.now() + SCHEDULER_TICK_MS),
+				"onSchedulerTick",
+				{},
+			);
+		}
+	}
 
-		const now = Date.now();
+	/**
+	 * Phase 4 — fiber body for `onSchedulerTick`. Lifts the build/decide/
+	 * apply path so it's checkpointable and recoverable.
+	 */
+	private async runSchedulerTickFiber(
+		ctx: { stash(d: unknown): void; snapshot: unknown | null },
+	): Promise<void> {
+		const snap = (ctx.snapshot ?? {}) as Partial<SchedulerTickFiberSnapshot>;
+		const now = snap.now ?? Date.now();
 		this.setState({ ...this.state, last_tick_at_ms: now });
 
-		// Wave 8B-C: manual pause short-circuits — re-arm the next tick but
-		// emit zero new assignments. Lets the lead freeze the brigade for a
-		// debrief / safety pause without losing the alarm cadence.
+		// Wave 8B-C: manual pause short-circuits.
 		if (this.state.paused) {
 			await this.recordEvent({
 				kind: "scheduler_tick",
@@ -1097,13 +1137,28 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 			return;
 		}
 
-		// Build the scheduler input. Track B will hydrate `graph` from
-		// D1.mise_task_graphs by `task_graph_id` and `members` from
-		// MemberAgent presence; Track A populates the additive fields the
-		// scheduler heuristic uses (equipment claims, churn, DAG affinity).
-		// The scheduler tolerates empty graph/members.
+		const input: BrigadeSchedulerInput = snap.input ?? (await this.buildSchedulerInput(now));
+		ctx.stash({ now, input } satisfies SchedulerTickFiberSnapshot);
+
+		const output: BrigadeSchedulerOutput = snap.output ?? tickScheduler(input);
+		ctx.stash({ now, input, output } satisfies SchedulerTickFiberSnapshot);
+
+		if (!snap.applied) {
+			await this.applySchedulerOutput(now, output);
+		}
+		ctx.stash({ now, input, output, applied: true } satisfies SchedulerTickFiberSnapshot);
+
+		// Reschedule the next tick.
+		await this.schedule(
+			new Date(now + SCHEDULER_TICK_MS),
+			"onSchedulerTick",
+			{},
+		);
+	}
+
+	private async buildSchedulerInput(now: number): Promise<BrigadeSchedulerInput> {
 		const completed_task_ids = this.readCompletedTaskIds();
-		const input = {
+		return {
 			graph: {
 				recipe_id: "",
 				meal_id: this.state.meal_id,
@@ -1121,8 +1176,12 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 			recently_completed: this.readRecentlyCompleted(now),
 			member_completed_dag_neighbors: this.readMemberCompletedTaskMap(),
 		};
+	}
 
-		const decision = tickScheduler(input);
+	private async applySchedulerOutput(
+		now: number,
+		decision: BrigadeSchedulerOutput,
+	): Promise<void> {
 		await this.recordEvent({
 			kind: "scheduler_tick",
 			member_id: null,
@@ -1134,8 +1193,6 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 			emitted_at_ms: now,
 		});
 
-		// Apply assignments. Wave 8B will fill new_assignments; foundation
-		// loops over the (currently empty) list to lock the path.
 		for (const assignment of decision.new_assignments) {
 			this.sql`
 				INSERT OR REPLACE INTO task_assignments
@@ -1156,13 +1213,6 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 				emitted_at_ms: now,
 			});
 		}
-
-		// Reschedule the next tick.
-		await this.schedule(
-			new Date(now + SCHEDULER_TICK_MS),
-			"onSchedulerTick",
-			{},
-		);
 	}
 
 	async onHardTimeout(): Promise<void> {
@@ -1965,6 +2015,37 @@ export class CookingLeadAgent extends Agent<AgentEnv, CookingLeadState> {
 			meal_id: this.state.meal_id,
 			notes,
 		});
+	}
+
+	// ─── Phase 4 — Fiber recovery ────────────────────────────────────────
+
+	/**
+	 * If the worker died mid-tick, replay the side-effect step (idempotent
+	 * via INSERT OR REPLACE on task_assignments). If the snapshot is stale
+	 * (older than 2 ticks), drop it — the next live tick will produce a
+	 * fresher decision.
+	 */
+	async onFiberRecovered(ctx: FiberRecoveryContext): Promise<void> {
+		if (ctx.name === "scheduler_tick") {
+			const snap = (ctx.snapshot ?? {}) as Partial<SchedulerTickFiberSnapshot>;
+			if (snap.applied) return;
+			const stale = Date.now() - (snap.now ?? ctx.createdAt) > SCHEDULER_TICK_MS * 2;
+			try {
+				if (snap.output && !stale && typeof snap.now === "number") {
+					await this.applySchedulerOutput(snap.now, snap.output);
+				}
+				// Always re-arm the next tick so the cadence recovers.
+				await this.schedule(
+					new Date(Date.now() + SCHEDULER_TICK_MS),
+					"onSchedulerTick",
+					{},
+				);
+			} catch (err) {
+				console.warn(`[cooking-lead-agent] onFiberRecovered(scheduler_tick) failed:`, err);
+			}
+			return;
+		}
+		await super.onFiberRecovered(ctx);
 	}
 
 	// ─── Test seam ────────────────────────────────────────────────────────

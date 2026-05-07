@@ -12,7 +12,7 @@
 //   * Every state-mutating route wraps with beginTrace/completeTrace for
 //     replay debug.
 
-import { Agent } from "agents";
+import { Agent, type FiberRecoveryContext } from "agents";
 import {
 	type AgentEnv,
 	generateAgentId,
@@ -23,12 +23,23 @@ import {
 	computeMorningBrief,
 	loadBriefForDate,
 	loadLatestBrief,
+	type MorningBriefResult,
 	nextLocal7am,
 	persistMorningBrief,
 } from "./household-cycles";
 import { beginTrace, completeTrace } from "../agent-trace";
 import { getHouseholdProfile } from "../household-model";
 import { listMembers } from "../household-members";
+
+/**
+ * Phase 4 — checkpoint snapshot for the `morning_brief` fiber. Each step
+ * of `runMorningBriefPipeline` stashes a richer snapshot so a recovery
+ * call can short-circuit work that's already durable.
+ */
+export interface MorningBriefSnapshot {
+	brief: MorningBriefResult;
+	persisted_id: string;
+}
 
 export interface HouseholdAgentState {
 	household_id: string;
@@ -276,51 +287,132 @@ export class HouseholdAgent extends Agent<AgentEnv, HouseholdAgentState> {
 	/**
 	 * Daily brief alarm callback. Runs the brief pipeline and persists the
 	 * row, then reschedules itself for the next local 7am.
+	 *
+	 * Phase 4: wraps the multi-step brief pipeline in a Fiber. Each major
+	 * step stashes its result, so if the worker dies between steps the
+	 * `onFiberRecovered` hook can resume from the last checkpoint instead
+	 * of re-running everything (or losing the brief entirely).
 	 */
 	async morningCheckin(): Promise<void> {
 		if (!this.state.household_id) return;
+		try {
+			await this.runFiber("morning_brief", async (ctx) => {
+				await this.runMorningBriefPipeline(
+					ctx as { stash(data: unknown): void; snapshot: unknown | null },
+				);
+			});
+		} catch (err) {
+			console.warn(`[household-agent] morning_brief fiber failed:`, err);
+		} finally {
+			await this.scheduleNextDailyBrief();
+		}
+	}
+
+	/**
+	 * Phase 4 — Fiber-checkpointed pipeline used by both `morningCheckin`
+	 * (first run) and `onFiberRecovered` (resume after crash).
+	 *
+	 * Stash schedule:
+	 *   1. After computeMorningBrief    → `{ brief }`
+	 *   2. After persistMorningBrief    → `{ brief, persisted_id }`
+	 *
+	 * Resume policy: if we have `persisted_id`, the brief is durable in D1
+	 * — just reapply the in-DO state mirror and exit. If we only have
+	 * `brief`, skip the recompute and persist. Otherwise, run the whole
+	 * pipeline.
+	 */
+	private async runMorningBriefPipeline(
+		ctx: { stash(data: unknown): void; snapshot: unknown | null },
+	): Promise<void> {
+		const household_id = this.state.household_id;
+		if (!household_id) return;
+
 		const trace = beginTrace({
 			tool_name: "household_agent.morning_checkin",
-			tool_args: { household_id: this.state.household_id },
+			tool_args: { household_id, resumed: ctx.snapshot != null },
 			caller_kind: "cron",
-			caller_id: householdAgentName(this.state.household_id),
-			household_id: this.state.household_id,
+			caller_id: householdAgentName(household_id),
+			household_id,
 		});
 		try {
-			const brief = await computeMorningBrief(this.env, this.state.household_id, {
-				skip_weather: true,
-			});
-			const persisted = await persistMorningBrief(this.env, brief);
+			const snap = (ctx.snapshot ?? {}) as Partial<MorningBriefSnapshot>;
+
+			// Step 1 — compute the brief (skip if already in snapshot).
+			const brief: MorningBriefResult = snap.brief
+				?? (await computeMorningBrief(this.env, household_id, { skip_weather: true }));
+			ctx.stash({ brief } satisfies Partial<MorningBriefSnapshot>);
+
+			// Step 2 — persist to D1 (skip if already persisted on resume).
+			let persisted_id: string;
+			if (snap.persisted_id) {
+				persisted_id = snap.persisted_id;
+			} else {
+				const persisted = await persistMorningBrief(this.env, brief);
+				persisted_id = persisted.id;
+				ctx.stash({ brief, persisted_id } satisfies Partial<MorningBriefSnapshot>);
+			}
+
+			// Step 3 — mirror into the DO's local state + checkin log.
 			this.sql`
 				INSERT INTO checkins (id, at_ms, result, brief_id, trace_id)
 				VALUES (
 					${generateAgentId("ck")},
 					${Date.now()},
-					${"ok"},
-					${persisted.id},
+					${snap.persisted_id ? "recovered" : "ok"},
+					${persisted_id},
 					${trace.trace_id}
 				)
 			`;
 			this.setState({
 				...this.state,
 				last_brief_at_ms: Date.now(),
-				last_brief_id: persisted.id,
+				last_brief_id: persisted_id,
 			});
+
 			await completeTrace(this.env, trace, {
 				ok: true,
 				result: {
-					brief_id: persisted.id,
+					brief_id: persisted_id,
 					plan_count: brief.plan_health.length,
 					suggestion_count: brief.suggestions.length,
+					recovered: !!snap.persisted_id,
 				},
-				result_summary: `morning_checkin brief=${persisted.id} plans=${brief.plan_health.length}`,
+				result_summary: `morning_checkin brief=${persisted_id} plans=${brief.plan_health.length}`,
 			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			await completeTrace(this.env, trace, { ok: false, error: message });
-		} finally {
-			await this.scheduleNextDailyBrief();
+			throw err;
 		}
+	}
+
+	/**
+	 * Phase 4 — Fiber recovery hook. Resumes interrupted fibers from their
+	 * last checkpoint after a worker eviction.
+	 */
+	async onFiberRecovered(ctx: FiberRecoveryContext): Promise<void> {
+		if (ctx.name === "morning_brief") {
+			try {
+				// Re-enter the pipeline with the recovered snapshot. The
+				// pipeline itself decides which steps to skip based on what's
+				// already stashed.
+				await this.runFiber("morning_brief", async (inner) => {
+					// Carry the recovered snapshot forward so the inner ctx
+					// sees it on first read.
+					if (ctx.snapshot != null && (inner as { snapshot: unknown | null }).snapshot == null) {
+						(inner as { stash(d: unknown): void }).stash(ctx.snapshot);
+					}
+					await this.runMorningBriefPipeline(
+						inner as { stash(d: unknown): void; snapshot: unknown | null },
+					);
+				});
+			} catch (err) {
+				console.warn(`[household-agent] onFiberRecovered(morning_brief) failed:`, err);
+			}
+			return;
+		}
+		// Unknown fiber — fall through to default warning behaviour.
+		await super.onFiberRecovered(ctx);
 	}
 
 	private async scheduleNextDailyBrief(): Promise<void> {

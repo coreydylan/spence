@@ -17,7 +17,7 @@
 // Tracing: every transition is wrapped in beginTrace/completeTrace so
 // PlanAgent / replay UI can walk the state-machine history.
 
-import { Agent } from "agents";
+import { Agent, type FiberRecoveryContext } from "agents";
 import {
 	beginTrace,
 	completeTrace,
@@ -165,6 +165,20 @@ interface MarkEatenBody {
 interface AlarmPayload {
 	target_phase: MealPhase;
 	scheduled_at_ms: number;
+}
+
+/**
+ * Phase 4 — fiber checkpoint snapshot for `transition_to_<phase>` fibers.
+ * Tracks how far the transition got so a recovery hook knows what to
+ * re-do.
+ */
+export interface PhaseTransitionFiberSnapshot {
+	from: MealPhase;
+	to: MealPhase;
+	reason: string;
+	now: number;
+	result?: PhaseHandlerResult;
+	applied?: boolean;
 }
 
 export class MealAgent extends Agent<AgentEnv, MealAgentState> {
@@ -622,19 +636,34 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			// 2. Update state up-front so handlers see the new phase.
 			this.setState({ ...this.state, phase: to, last_transition_at_ms: now });
 
-			// 3. Run the new phase's entry handler.
-			const result = await this.runPhaseEntry(to, reason, now);
+			// Phase 4 — wrap the side-effect-heavy handler in a Fiber so a
+			// crash mid-handler can resume without losing partial work.
+			// Stash schedule:
+			//   1. Empty `{}` at fiber start (so onFiberRecovered knows the
+			//      transition was committed).
+			//   2. `{ result }` after the handler returns — handler ran, but
+			//      side-effects (D1 inserts, alarm) may not have all landed.
+			//   3. `{ result, applied: true }` after applyHandlerResult +
+			//      alarm scheduling — full success.
+			let result!: PhaseHandlerResult;
+			await this.runFiber(`transition_to_${to}`, async (fiberCtx) => {
+				fiberCtx.stash({ from, to, reason, now } satisfies PhaseTransitionFiberSnapshot);
 
-			// 4. Schedule the next alarm if the handler asked for one.
-			if (result.next_alarm_at_ms && to !== "archived") {
-				await this.schedule(new Date(result.next_alarm_at_ms), "onPhaseAlarm" as never, {
-					target_phase: this.nextPhaseAfter(to),
-					scheduled_at_ms: result.next_alarm_at_ms,
-				} satisfies AlarmPayload as never);
-				this.setState({ ...this.state, next_alarm_at_ms: result.next_alarm_at_ms });
-			} else {
-				this.setState({ ...this.state, next_alarm_at_ms: null });
-			}
+				const computed = await this.runPhaseEntryInner(to, reason, now);
+				fiberCtx.stash({ from, to, reason, now, result: computed } satisfies PhaseTransitionFiberSnapshot);
+
+				await this.applyHandlerResult(computed);
+				await this.applyPhaseStateHooks(to, now, computed);
+				await this.scheduleNextPhaseAlarm(to, computed);
+
+				fiberCtx.stash({
+					from, to, reason, now,
+					result: computed,
+					applied: true,
+				} satisfies PhaseTransitionFiberSnapshot);
+
+				result = computed;
+			});
 
 			await completeTrace(this.env, traceCtx, {
 				ok: true,
@@ -654,6 +683,130 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 		}
 	}
 
+	/**
+	 * Phase 4 — recovery hook for transition fibers. If the worker died
+	 * mid-transition, replay the side effects that hadn't landed yet.
+	 *
+	 * - If snapshot has `applied: true`, the work is durable; nothing to do.
+	 * - If snapshot has `result` but no `applied`, re-apply side effects
+	 *   (D1 inserts are idempotent on PK; alarm rescheduling is fine).
+	 * - If snapshot has just `from/to/reason`, we know the audit row +
+	 *   state update committed but the handler never returned. Re-run.
+	 */
+	async onFiberRecovered(ctx: FiberRecoveryContext): Promise<void> {
+		const name = ctx.name;
+		if (name && name.startsWith("transition_to_")) {
+			const snap = (ctx.snapshot ?? {}) as Partial<PhaseTransitionFiberSnapshot>;
+			if (!snap.to) return;
+			if (snap.applied) return;
+			try {
+				if (snap.result) {
+					await this.applyHandlerResult(snap.result);
+					await this.applyPhaseStateHooks(snap.to, snap.now ?? Date.now(), snap.result);
+					await this.scheduleNextPhaseAlarm(snap.to, snap.result);
+				} else {
+					const recomputed = await this.runPhaseEntryInner(
+						snap.to,
+						snap.reason ?? "fiber_recovery",
+						snap.now ?? Date.now(),
+					);
+					await this.applyHandlerResult(recomputed);
+					await this.applyPhaseStateHooks(snap.to, snap.now ?? Date.now(), recomputed);
+					await this.scheduleNextPhaseAlarm(snap.to, recomputed);
+				}
+			} catch (err) {
+				console.warn(`[meal-agent] onFiberRecovered(${name}) failed:`, err);
+			}
+			return;
+		}
+		await super.onFiberRecovered(ctx);
+	}
+
+	/**
+	 * Apply phase-specific MealAgent state mutations (cook session id,
+	 * eaten timestamp, and the Wave 8 CookingLeadAgent hand-off).
+	 *
+	 * Split out of `runPhaseEntry` so it can be re-invoked from the fiber
+	 * recovery path.
+	 */
+	private async applyPhaseStateHooks(
+		phase: MealPhase,
+		now_ms: number,
+		result: PhaseHandlerResult,
+	): Promise<void> {
+		if (phase === "active_cook" && result.cook_session_marker) {
+			const cook_session_id = result.cook_session_marker.cook_session_id;
+			this.setState({ ...this.state, cook_session_id });
+			await this.spawnCookingLeadAgent(cook_session_id, result);
+		}
+		if (phase === "eaten") {
+			this.setState({ ...this.state, eaten_at_ms: now_ms });
+			// Phase 2 — auto-spawn the CookSessionDebriefWorkflow so the
+			// household gets a taste-rating prompt ~30 min after eating.
+			// The workflow id is the cook_session_id (one debrief per
+			// session). create() is idempotent: if the worker died mid-
+			// transition and recovers, the second create() throws an
+			// already-exists error which we swallow.
+			await this.spawnCookDebriefWorkflow();
+		}
+	}
+
+	/**
+	 * Phase 2 — kick off the durable post-meal debrief workflow.
+	 *
+	 * Best-effort: when the worker is running against a deployment that
+	 * hasn't yet rolled the [[workflows]] binding, the env field is
+	 * undefined and we silently no-op. When the workflow already exists
+	 * for this cook session (e.g. fiber recovery re-runs the eaten path)
+	 * we tolerate the duplicate-id error.
+	 */
+	private async spawnCookDebriefWorkflow(): Promise<void> {
+		const wf = this.env.COOK_DEBRIEF_WORKFLOW;
+		if (!wf) return;
+		const cook_session_id = this.state.cook_session_id;
+		const meal_id = this.state.meal_id;
+		const plan_id = this.state.plan_id;
+		const household_id = this.state.household_id;
+		if (!cook_session_id || !meal_id || !plan_id || !household_id) return;
+		try {
+			await wf.create({
+				id: cook_session_id,
+				params: {
+					cook_session_id,
+					meal_id,
+					plan_id,
+					household_id,
+					meal_date: this.state.date ?? undefined,
+					meal_slot: this.state.slot ?? undefined,
+					meal_format: this.state.format ?? undefined,
+					meal_cuisine: this.state.cuisine,
+				},
+			});
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			// Already-running / already-completed errors are fine — the
+			// debrief is idempotent on the cook_session_id.
+			if (!/already exists|duplicate/i.test(msg)) {
+				console.warn(`[meal-agent] cook-debrief workflow spawn failed: ${msg}`);
+			}
+		}
+	}
+
+	private async scheduleNextPhaseAlarm(
+		to: MealPhase,
+		result: PhaseHandlerResult,
+	): Promise<void> {
+		if (result.next_alarm_at_ms && to !== "archived") {
+			await this.schedule(new Date(result.next_alarm_at_ms), "onPhaseAlarm" as never, {
+				target_phase: this.nextPhaseAfter(to),
+				scheduled_at_ms: result.next_alarm_at_ms,
+			} satisfies AlarmPayload as never);
+			this.setState({ ...this.state, next_alarm_at_ms: result.next_alarm_at_ms });
+		} else {
+			this.setState({ ...this.state, next_alarm_at_ms: null });
+		}
+	}
+
 	private nextPhaseAfter(phase: MealPhase): MealPhase {
 		switch (phase) {
 			case "planned": return "pre_eve";
@@ -669,7 +822,14 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 
 	// ─── Run a phase's entry handler + apply side effects ────────────────
 
-	private async runPhaseEntry(
+	/**
+	 * Phase 4 — pure phase-handler dispatch. Returns the handler's
+	 * `PhaseHandlerResult` without applying any side effects so the
+	 * fiber wrapper can checkpoint the result before the side effects
+	 * land. `applyHandlerResult` + `applyPhaseStateHooks` +
+	 * `scheduleNextPhaseAlarm` are called by the wrapper.
+	 */
+	private async runPhaseEntryInner(
 		phase: MealPhase,
 		reason: string,
 		now_ms: number,
@@ -699,12 +859,11 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 			adults,
 		};
 
-		let result: PhaseHandlerResult;
 		const isCancelled = phase === "archived" && reason.startsWith("cancelled:");
 
 		switch (phase) {
 			case "planned":
-				result = {
+				return {
 					phase: "planned",
 					briefings: [],
 					notifications: [],
@@ -712,32 +871,24 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 					notes: [],
 					next_alarm_at_ms: null,
 				};
-				break;
 			case "pre_eve":
-				result = await pre_eve_entry(fullSnapshot, deps);
-				break;
+				return await pre_eve_entry(fullSnapshot, deps);
 			case "day_of":
-				result = await day_of_entry(fullSnapshot, deps);
-				break;
+				return await day_of_entry(fullSnapshot, deps);
 			case "cook_window":
-				result = await cook_window_entry(fullSnapshot, deps, this);
-				break;
+				return await cook_window_entry(fullSnapshot, deps, this);
 			case "active_cook":
-				result = await active_cook_entry(fullSnapshot, deps);
-				break;
+				return await active_cook_entry(fullSnapshot, deps);
 			case "eaten":
-				result = await eaten_entry(fullSnapshot, deps, this.state.cook_session_id);
-				break;
+				return await eaten_entry(fullSnapshot, deps, this.state.cook_session_id);
 			case "archived":
 				if (isCancelled) {
 					const reasonText = reason.slice("cancelled:".length) || "unspecified";
-					result = await cancelled_entry(fullSnapshot, deps, this, reasonText);
-				} else {
-					result = await archived_entry(fullSnapshot, deps, this);
+					return await cancelled_entry(fullSnapshot, deps, this, reasonText);
 				}
-				break;
+				return await archived_entry(fullSnapshot, deps, this);
 			default:
-				result = {
+				return {
 					phase: phase as never,
 					briefings: [],
 					notifications: [],
@@ -746,29 +897,6 @@ export class MealAgent extends Agent<AgentEnv, MealAgentState> {
 					next_alarm_at_ms: null,
 				};
 		}
-
-		await this.applyHandlerResult(result);
-
-		// Phase-specific state hooks.
-		if (phase === "active_cook" && result.cook_session_marker) {
-			const cook_session_id = result.cook_session_marker.cook_session_id;
-			this.setState({
-				...this.state,
-				cook_session_id,
-			});
-			// ── Wave 8 hand-off boundary ──────────────────────────────────
-			// Spawn the ephemeral CookingLeadAgent for this cook session.
-			// Best-effort — when the binding isn't present (Wave 7 deploys,
-			// tests without the namespace) the marker stays as the pre-Wave-8
-			// "session started" indicator. Wave 8B builds out the brigade UX
-			// from inside the lead agent.
-			await this.spawnCookingLeadAgent(cook_session_id, result);
-		}
-		if (phase === "eaten") {
-			this.setState({ ...this.state, eaten_at_ms: now_ms });
-		}
-
-		return result;
 	}
 
 	/**

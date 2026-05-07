@@ -1,3 +1,14 @@
+/** Cloudflare Workers AI binding shape — `env.AI.run(model, options)`. We
+ *  type it loosely (record-ish input/output) because the full Workers AI
+ *  surface is huge and we only call llama-3.2-3b-instruct from the intent
+ *  router. */
+export interface WorkersAiBinding {
+	run(
+		model: string,
+		options: Record<string, unknown>,
+	): Promise<unknown>;
+}
+
 export interface MiseGraphEnv {
 	DB: D1Database;
 	// Mesh-Claude bridge (optional — only present when wrangler config wires
@@ -7,6 +18,11 @@ export interface MiseGraphEnv {
 	BRIDGE_HOST?: string;
 	BRIDGE_PORT?: string;
 	BRIDGE_SECRET?: string;
+	// Workers AI binding — cheap fast classifier (Phase 3 intent router uses
+	// @cf/meta/llama-3.2-3b-instruct). Optional so older configs / tests that
+	// don't wire it still typecheck; the intent router defaults to free_chat
+	// when the binding is missing.
+	AI?: WorkersAiBinding;
 }
 
 export interface MiseIngredientState {

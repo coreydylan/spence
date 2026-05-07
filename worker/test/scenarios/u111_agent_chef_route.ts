@@ -35,8 +35,12 @@ import {
 	handleAgentChefRoute,
 	householdIdFromEmail,
 	makeSseStream,
+	parseToolCalls,
 	resolveHouseholdId,
 	runAgentChef,
+	stringifyToolResult,
+	CHEF_ALLOWED_TOOLS,
+	TOOL_RESULT_TRUNCATION_LIMIT,
 	type AgentChefRouteEnv,
 	type ChefEvent,
 } from "../../src/mise-graph/agent-chef-route";
@@ -249,9 +253,11 @@ const u111: Scenario = {
 		ctx.assert.contains(receivedPrompt, "Recent conversation", "user prompt prepends history when present");
 
 		// ── buildSystemPrompt unit ────────────────────────────────────────
-		const sysWithSignals = buildSystemPrompt(readyStatus, readyStatus.signals);
-		ctx.assert.contains(sysWithSignals, "Tools available", "system prompt lists tool catalog");
+		const sysWithSignals = buildSystemPrompt(readyStatus, readyStatus.signals, HH_READY);
+		ctx.assert.contains(sysWithSignals, "Available tools", "system prompt lists tool catalog");
 		ctx.assert.contains(sysWithSignals, "chef_status_check", "tool catalog mentions chef_status_check");
+		ctx.assert.contains(sysWithSignals, "[[TOOL_CALL]]", "system prompt teaches the tool-call wire format");
+		ctx.assert.contains(sysWithSignals, HH_READY, "system prompt embeds the resolved household_id");
 
 		// ── 3. Bridge error path ──────────────────────────────────────────
 		const events3 = await collectViaEmitter(emit =>
@@ -281,6 +287,210 @@ const u111: Scenario = {
 		if (last3.kind === "done") {
 			ctx.assert.eq(last3.reason, "bridge_error", "done.reason is bridge_error after error event");
 		}
+
+		// ── 3a. parseToolCalls + stringifyToolResult units ───────────────
+		const parsedNone = parseToolCalls("Just a plain reply, nothing structured here.");
+		ctx.assert.eq(parsedNone.calls.length, 0, "no tool calls when text is plain");
+		ctx.assert.contains(parsedNone.leadingText, "plain reply", "leading text preserved when no calls");
+
+		const parsedOne = parseToolCalls(
+			"Reading your pantry now.\n[[TOOL_CALL]]\n{\"name\": \"inspire_read_household_signals\", \"args\": {\"household_id\": \"hh_x\"}}\n[[/TOOL_CALL]]\nDone.",
+		);
+		ctx.assert.eq(parsedOne.calls.length, 1, "single tool-call envelope parsed");
+		ctx.assert.eq(parsedOne.calls[0].name, "inspire_read_household_signals", "tool name extracted");
+		ctx.assert.eq(parsedOne.calls[0].args.household_id, "hh_x", "tool args extracted");
+		ctx.assert.contains(parsedOne.leadingText, "Reading your pantry", "leading text strips the call block");
+		ctx.assert.contains(parsedOne.leadingText, "Done.", "trailing text preserved");
+
+		const parsedMulti = parseToolCalls(
+			"[[TOOL_CALL]]\n{\"name\":\"plan_list\",\"args\":{}}\n[[/TOOL_CALL]]\n[[TOOL_CALL]]\n{\"name\":\"plan_read_summary\",\"args\":{\"plan_id\":\"p1\"}}\n[[/TOOL_CALL]]",
+		);
+		ctx.assert.eq(parsedMulti.calls.length, 2, "two tool-call envelopes parsed");
+		ctx.assert.eq(parsedMulti.calls[1].name, "plan_read_summary", "second envelope's name");
+
+		const parsedMalformed = parseToolCalls("[[TOOL_CALL]]\nnot json at all\n[[/TOOL_CALL]]");
+		ctx.assert.eq(parsedMalformed.calls.length, 0, "malformed envelopes are dropped");
+
+		const big = stringifyToolResult({
+			ok: true,
+			big_string: "x".repeat(5000),
+		});
+		ctx.assert.ok(big.text.length <= TOOL_RESULT_TRUNCATION_LIMIT + 200, "stringifyToolResult respects budget");
+		ctx.assert.eq(big.truncated, true, "stringifyToolResult flags truncation");
+		// Must remain JSON-valid after truncation.
+		JSON.parse(big.text);
+
+		const small = stringifyToolResult({ ok: true, x: 1 });
+		ctx.assert.eq(small.truncated, false, "small payloads are not flagged");
+
+		// ── 3b. Single tool call → dispatch → result feeds follow-up ─────
+		const HH_TOOL = HH_READY;
+		const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+		const fakeTools = async (
+			name: string,
+			args: Record<string, unknown>,
+			_env: MiseGraphEnv,
+		): Promise<Record<string, unknown>> => {
+			toolCalls.push({ name, args });
+			if (name === "inspire_read_household_signals") {
+				return { ok: true, household_id: args.household_id, pantry_top: [{ category: "grains", items: ["rice", "oats"] }] };
+			}
+			return { ok: true };
+		};
+
+		const bridgeReplies: string[] = [
+			"Let me check.\n[[TOOL_CALL]]\n{\"name\":\"inspire_read_household_signals\",\"args\":{\"household_id\":\"" + HH_TOOL + "\"}}\n[[/TOOL_CALL]]",
+			"You've got rice and oats on hand.",
+		];
+		let bridgeIdx = 0;
+		const fakeBridge2 = async (): Promise<MeshClaudeResponse> => ({
+			ok: true,
+			sessionId: null,
+			text: bridgeReplies[bridgeIdx++] ?? "(no more)",
+			elapsedMs: 1,
+			messageCount: 1,
+			toolCalls: 0,
+			yieldDetected: false,
+		});
+
+		const events4 = await collectViaEmitter(emit =>
+			runAgentChef(emit as { send: (e: ChefEvent) => void; close?: () => void }, {
+				body: { message: "what's in my pantry" },
+				household_id: HH_TOOL,
+				env: readyEnv,
+				bridge: fakeBridge2,
+				toolDispatcher: fakeTools,
+				chunkDelayMs: 0,
+			}),
+		);
+		const startEvents = events4.filter(e => e.kind === "tool_call_start");
+		const resultEvents = events4.filter(e => e.kind === "tool_call_result");
+		ctx.assert.eq(startEvents.length, 1, "single tool_call_start emitted");
+		ctx.assert.eq(resultEvents.length, 1, "single tool_call_result emitted");
+		ctx.assert.eq(toolCalls.length, 1, "tool dispatcher called once");
+		ctx.assert.eq(toolCalls[0].name, "inspire_read_household_signals", "right tool dispatched");
+		ctx.assert.eq(toolCalls[0].args.household_id, HH_TOOL, "household_id forced into tool args");
+		const iterEvents = events4.filter(e => e.kind === "iteration_start");
+		ctx.assert.gte(iterEvents.length, 2, "at least two bridge iterations");
+		const finalText4 = events4
+			.filter(e => e.kind === "text")
+			.map(e => (e as Extract<ChefEvent, { kind: "text" }>).delta)
+			.join("");
+		ctx.assert.contains(finalText4, "rice and oats", "final text reflects tool result");
+
+		// ── 3c. Multiple tool calls in one bridge response ───────────────
+		const multiCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+		const multiTools = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+			multiCalls.push({ name, args });
+			return { ok: true, name };
+		};
+		const multiReplies = [
+			"[[TOOL_CALL]]\n{\"name\":\"plan_list\",\"args\":{\"household_id\":\"" + HH_TOOL + "\"}}\n[[/TOOL_CALL]]\n[[TOOL_CALL]]\n{\"name\":\"household_get_traits\",\"args\":{\"household_id\":\"" + HH_TOOL + "\"}}\n[[/TOOL_CALL]]",
+			"Got it — both reads done.",
+		];
+		let mIdx = 0;
+		const events5 = await collectViaEmitter(emit =>
+			runAgentChef(emit as { send: (e: ChefEvent) => void; close?: () => void }, {
+				body: { message: "audit me" },
+				household_id: HH_TOOL,
+				env: readyEnv,
+				bridge: async () => ({ ok: true, sessionId: null, text: multiReplies[mIdx++] ?? "", elapsedMs: 1, messageCount: 1, toolCalls: 0, yieldDetected: false }),
+				toolDispatcher: multiTools as unknown as Parameters<typeof runAgentChef>[1]["toolDispatcher"],
+				chunkDelayMs: 0,
+			}),
+		);
+		const startsM = events5.filter(e => e.kind === "tool_call_start");
+		ctx.assert.eq(startsM.length, 2, "two tool_call_start events from one bridge response");
+		ctx.assert.eq(multiCalls.length, 2, "dispatcher called twice");
+
+		// ── 3d. Disallowed tool name → tool_call_error ───────────────────
+		const blockReplies = [
+			"[[TOOL_CALL]]\n{\"name\":\"plan_lock_meal\",\"args\":{\"plan_id\":\"p1\"}}\n[[/TOOL_CALL]]",
+			"Can't do that — different tool needed.",
+		];
+		let bIdx = 0;
+		const blockedDispatched: string[] = [];
+		const blockedTools = async (name: string): Promise<Record<string, unknown>> => {
+			blockedDispatched.push(name);
+			return { ok: true };
+		};
+		const events6 = await collectViaEmitter(emit =>
+			runAgentChef(emit as { send: (e: ChefEvent) => void; close?: () => void }, {
+				body: { message: "lock my meal" },
+				household_id: HH_TOOL,
+				env: readyEnv,
+				bridge: async () => ({ ok: true, sessionId: null, text: blockReplies[bIdx++] ?? "", elapsedMs: 1, messageCount: 1, toolCalls: 0, yieldDetected: false }),
+				toolDispatcher: blockedTools as unknown as Parameters<typeof runAgentChef>[1]["toolDispatcher"],
+				chunkDelayMs: 0,
+			}),
+		);
+		const errEvent = events6.find(e => e.kind === "tool_call_error");
+		ctx.assert.ok(!!errEvent, "disallowed tool emits tool_call_error");
+		if (errEvent && errEvent.kind === "tool_call_error") {
+			ctx.assert.contains(errEvent.message, "tool not allowed", "error message labels the disallow");
+			ctx.assert.eq(errEvent.tool, "plan_lock_meal", "error names the offending tool");
+		}
+		ctx.assert.eq(blockedDispatched.length, 0, "disallowed tool never reaches the dispatcher");
+		ctx.assert.ok(!CHEF_ALLOWED_TOOLS.has("plan_lock_meal"), "fixture: plan_lock_meal is correctly off-list");
+
+		// ── 3e. Bridge response without tool calls → final text path ────
+		const noToolBridge = async (): Promise<MeshClaudeResponse> => ({
+			ok: true,
+			sessionId: null,
+			text: "Just chatting — nothing to look up.",
+			elapsedMs: 1,
+			messageCount: 1,
+			toolCalls: 0,
+			yieldDetected: false,
+		});
+		const events7 = await collectViaEmitter(emit =>
+			runAgentChef(emit as { send: (e: ChefEvent) => void; close?: () => void }, {
+				body: { message: "hey" },
+				household_id: HH_TOOL,
+				env: readyEnv,
+				bridge: noToolBridge,
+				toolDispatcher: async () => ({}),
+				chunkDelayMs: 0,
+			}),
+		);
+		const tEvents7 = events7.filter(e => e.kind === "tool_call_start");
+		ctx.assert.eq(tEvents7.length, 0, "no tool dispatch when bridge returns plain text");
+		const final7 = events7
+			.filter(e => e.kind === "text")
+			.map(e => (e as Extract<ChefEvent, { kind: "text" }>).delta)
+			.join("");
+		ctx.assert.contains(final7, "Just chatting", "plain-text bridge response surfaces verbatim");
+
+		// ── 3f. Iteration cap reached → fallback text + done ─────────────
+		const loopReplies = [
+			"[[TOOL_CALL]]\n{\"name\":\"plan_list\",\"args\":{\"household_id\":\"" + HH_TOOL + "\"}}\n[[/TOOL_CALL]]",
+			"[[TOOL_CALL]]\n{\"name\":\"plan_list\",\"args\":{\"household_id\":\"" + HH_TOOL + "\"}}\n[[/TOOL_CALL]]",
+		];
+		let loopIdx = 0;
+		const loopBridge = async (): Promise<MeshClaudeResponse> => ({
+			ok: true,
+			sessionId: null,
+			text: loopReplies[Math.min(loopIdx++, loopReplies.length - 1)],
+			elapsedMs: 1,
+			messageCount: 1,
+			toolCalls: 0,
+			yieldDetected: false,
+		});
+		const events8 = await collectViaEmitter(emit =>
+			runAgentChef(emit as { send: (e: ChefEvent) => void; close?: () => void }, {
+				body: { message: "loop me" },
+				household_id: HH_TOOL,
+				env: readyEnv,
+				bridge: loopBridge,
+				toolDispatcher: async () => ({ ok: true }),
+				chunkDelayMs: 0,
+				maxIterations: 2,
+			}),
+		);
+		const last8 = events8[events8.length - 1];
+		ctx.assert.eq(last8.kind, "done", "iteration cap still terminates with done");
+		const iterCount8 = events8.filter(e => e.kind === "iteration_start").length;
+		ctx.assert.eq(iterCount8, 2, "iteration cap clamps bridge round-trips");
 
 		// ── 4. handleAgentChefRoute: missing auth → 401 ───────────────────
 		const route401 = await handleAgentChefRoute(

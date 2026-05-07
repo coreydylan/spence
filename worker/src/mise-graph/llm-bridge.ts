@@ -13,12 +13,31 @@
 // Daemon contract (POST /v1/messages, body HMAC-signed in X-Bridge-Signature):
 //   { prompt, system?, model?, allowedTools?, cwd? }
 //   → { sessionId, elapsedMs, text, result, messageCount, toolCalls, yieldDetected, reason? }
+//
+// Phase 5 (AI Gateway): when AI_GATEWAY_ACCOUNT_ID + AI_GATEWAY_NAME are set
+// in env, the bridge fetch is wrapped through Cloudflare AI Gateway's
+// universal endpoint for caching / rate limit / cost observability. Otherwise
+// the direct MESH path is used. See ./llm-bridge-gateway.ts for details.
+
+import { fetchUpstream } from "./llm-bridge-gateway";
 
 export interface MeshClaudeEnv {
 	MESH: { fetch: typeof fetch };
 	BRIDGE_HOST: string;
 	BRIDGE_PORT: string;
 	BRIDGE_SECRET: string;
+	// Phase 5 — optional Cloudflare AI Gateway routing.
+	// When BOTH AI_GATEWAY_ACCOUNT_ID and AI_GATEWAY_NAME are set, the
+	// bridge fetch is wrapped through Cloudflare AI Gateway's universal
+	// endpoint for caching, rate limiting, cost tracking, and observability.
+	// When either is unset, the direct MESH path is used (unchanged behavior).
+	// AI_GATEWAY_TOKEN is only required for "authenticated" gateways; safe
+	// to leave unset for the default open gateway.
+	AI_GATEWAY_ACCOUNT_ID?: string;
+	AI_GATEWAY_NAME?: string;
+	AI_GATEWAY_TOKEN?: string;
+	AI_GATEWAY_CACHE_TTL?: string;       // seconds; default "60"
+	AI_GATEWAY_SKIP_CACHE_MARKER?: string; // prompt substring → skip cache; default "nonce"
 }
 
 export interface MeshClaudeRequest {
@@ -75,18 +94,20 @@ export async function callMeshClaude(env: MeshClaudeEnv, request: MeshClaudeRequ
 	const url = `http://${env.BRIDGE_HOST}:${env.BRIDGE_PORT}/v1/messages`;
 	const startedAt = Date.now();
 
+	const headers: Record<string, string> = {
+		"X-Bridge-Signature": sig,
+		"Content-Type": "application/json",
+	};
+
 	// Retry once on transient "Network connection lost" — long composer calls
 	// (~3 min) sometimes drop the keep-alive while the daemon is still working.
 	let resp: Response | null = null;
 	let lastErr: unknown = null;
 	for (let attempt = 0; attempt < 2; attempt++) {
 		try {
-			resp = await env.MESH.fetch(url, {
+			resp = await fetchUpstream(env, url, {
 				method: "POST",
-				headers: {
-					"X-Bridge-Signature": sig,
-					"Content-Type": "application/json",
-				},
+				headers,
 				body,
 			});
 			break;

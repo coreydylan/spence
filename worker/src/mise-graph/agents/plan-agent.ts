@@ -13,7 +13,7 @@
 //     the parent (e.g., ShopAgent flipped to active_today).
 //   * All mutations wrap with begin/completeTrace.
 
-import { Agent } from "agents";
+import { Agent, type FiberRecoveryContext } from "agents";
 import {
 	type AgentEnv,
 	generateAgentId,
@@ -27,6 +27,20 @@ import { scorePlanCoherence } from "../coherence-score";
 import { nextRecomputeAt, recomputePlanHealth } from "./plan-cycles";
 
 export type PlanAgentStatus = "draft" | "active" | "finalized" | "archived";
+
+/**
+ * Phase 4 — fiber checkpoint snapshot for the finalize spawn loop.
+ * Tracks per-child spawn status so a recovery picks up where the
+ * pre-crash run left off instead of re-spawning everything.
+ */
+export interface FinalizeFiberSnapshot {
+	plan_loaded: boolean;
+	meal_total: number;
+	shop_total: number;
+	spawned_meals: string[];
+	spawned_shops: string[];
+	finalized?: boolean;
+}
 
 export interface PlanAgentState {
 	plan_id: string;
@@ -212,62 +226,22 @@ export class PlanAgent extends Agent<AgentEnv, PlanAgentState> {
 			household_id: this.state.household_id || undefined,
 		});
 		try {
-			const plan = await loadActivePlan(this.env, this.state.plan_id);
 			let mealsSpawned = 0;
 			let shopsSpawned = 0;
-			if (plan) {
-				// Spawn one MealAgent per meal in meals_by_day + breakfasts.
-				const allMeals: Array<{ id: string; date: string; slot: string }> = [];
-				for (const day of plan.meals_by_day || []) {
-					for (const m of day.meals || []) {
-						allMeals.push({ id: m.id, date: day.date, slot: m.slot });
-					}
-				}
-				for (const b of plan.breakfasts || []) {
-					allMeals.push({ id: b.id, date: b.date, slot: b.slot });
-				}
-				for (const meal of allMeals) {
-					try {
-						const ns = this.env.MEAL_AGENT;
-						const stub = ns.get(ns.idFromName(mealAgentName(this.state.plan_id, meal.date, meal.slot)));
-						await stub.fetch(new Request("https://agent/internal/init", {
-							method: "POST",
-							body: JSON.stringify({
-								meal_id: meal.id,
-								plan_id: this.state.plan_id,
-								date: meal.date,
-								slot: meal.slot,
-							}),
-							headers: { "content-type": "application/json" },
-						}));
-						this.recordChild("meal", mealAgentName(this.state.plan_id, meal.date, meal.slot));
-						mealsSpawned++;
-					} catch (err) {
-						console.warn(`[plan-agent] failed to spawn meal-agent for ${meal.id}:`, err);
-					}
-				}
 
-				for (const run of plan.shop_runs || []) {
-					try {
-						const ns = this.env.SHOP_AGENT;
-						const stub = ns.get(ns.idFromName(shopAgentName(this.state.plan_id, run.id)));
-						await stub.fetch(new Request("https://agent/internal/init", {
-							method: "POST",
-							body: JSON.stringify({
-								shop_run_id: run.id,
-								plan_id: this.state.plan_id,
-								run_date: run.date,
-							}),
-							headers: { "content-type": "application/json" },
-						}));
-						this.recordChild("shop", shopAgentName(this.state.plan_id, run.id));
-						shopsSpawned++;
-					} catch (err) {
-						console.warn(`[plan-agent] failed to spawn shop-agent for ${run.id}:`, err);
-					}
-				}
-			}
-			this.setState({ ...this.state, status: "finalized", last_action: "finalize" });
+			// Phase 4 — wrap the spawn loop in a Fiber. If the worker dies
+			// mid-spawn, the recovered fiber resumes at the last checkpoint
+			// instead of re-spawning everything. Stash schedule:
+			//   1. After loadActivePlan      → `{ plan_loaded: true, totals }`
+			//   2. After each meal spawn     → push to `spawned_meals[]`
+			//   3. After each shop spawn     → push to `spawned_shops[]`
+			//   4. After status flip          → `{ finalized: true, ... }`
+			await this.runFiber("finalize_spawn", async (fiberCtx) => {
+				const counts = await this.runFinalizeSpawnFiber(fiberCtx);
+				mealsSpawned = counts.mealsSpawned;
+				shopsSpawned = counts.shopsSpawned;
+			});
+
 			this.recordAction("finalize", { meals_spawned: mealsSpawned, shops_spawned: shopsSpawned }, trace.trace_id);
 			await completeTrace(this.env, trace, {
 				ok: true,
@@ -286,6 +260,140 @@ export class PlanAgent extends Agent<AgentEnv, PlanAgentState> {
 			await completeTrace(this.env, trace, { ok: false, error: message });
 			return json({ error: message }, 500);
 		}
+	}
+
+	/**
+	 * Phase 4 — fiber body for `finalize_spawn`. Loads the plan, spawns
+	 * every child MealAgent + ShopAgent, then flips status. Each spawn
+	 * is checkpointed so a recovery starts at the next un-spawned child.
+	 */
+	private async runFinalizeSpawnFiber(
+		ctx: { stash(d: unknown): void; snapshot: unknown | null },
+	): Promise<{ mealsSpawned: number; shopsSpawned: number }> {
+		const snap = (ctx.snapshot ?? {}) as Partial<FinalizeFiberSnapshot>;
+		const spawnedMeals = new Set(snap.spawned_meals ?? []);
+		const spawnedShops = new Set(snap.spawned_shops ?? []);
+
+		const plan = await loadActivePlan(this.env, this.state.plan_id);
+		const allMeals: Array<{ id: string; date: string; slot: string }> = [];
+		const allShops: Array<{ id: string; date: string | null }> = [];
+		if (plan) {
+			for (const day of plan.meals_by_day || []) {
+				for (const m of day.meals || []) {
+					allMeals.push({ id: m.id, date: day.date, slot: m.slot });
+				}
+			}
+			for (const b of plan.breakfasts || []) {
+				allMeals.push({ id: b.id, date: b.date, slot: b.slot });
+			}
+			for (const run of plan.shop_runs || []) {
+				allShops.push({ id: run.id, date: run.date });
+			}
+		}
+
+		ctx.stash({
+			plan_loaded: true,
+			meal_total: allMeals.length,
+			shop_total: allShops.length,
+			spawned_meals: [...spawnedMeals],
+			spawned_shops: [...spawnedShops],
+		} satisfies FinalizeFiberSnapshot);
+
+		// Spawn meals.
+		for (const meal of allMeals) {
+			const childName = mealAgentName(this.state.plan_id, meal.date, meal.slot);
+			if (spawnedMeals.has(childName)) continue;
+			try {
+				const ns = this.env.MEAL_AGENT;
+				const stub = ns.get(ns.idFromName(childName));
+				await stub.fetch(new Request("https://agent/internal/init", {
+					method: "POST",
+					body: JSON.stringify({
+						meal_id: meal.id,
+						plan_id: this.state.plan_id,
+						date: meal.date,
+						slot: meal.slot,
+					}),
+					headers: { "content-type": "application/json" },
+				}));
+				this.recordChild("meal", childName);
+				spawnedMeals.add(childName);
+				ctx.stash({
+					plan_loaded: true,
+					meal_total: allMeals.length,
+					shop_total: allShops.length,
+					spawned_meals: [...spawnedMeals],
+					spawned_shops: [...spawnedShops],
+				} satisfies FinalizeFiberSnapshot);
+			} catch (err) {
+				console.warn(`[plan-agent] failed to spawn meal-agent for ${meal.id}:`, err);
+			}
+		}
+
+		// Spawn shops.
+		for (const run of allShops) {
+			const childName = shopAgentName(this.state.plan_id, run.id);
+			if (spawnedShops.has(childName)) continue;
+			try {
+				const ns = this.env.SHOP_AGENT;
+				const stub = ns.get(ns.idFromName(childName));
+				await stub.fetch(new Request("https://agent/internal/init", {
+					method: "POST",
+					body: JSON.stringify({
+						shop_run_id: run.id,
+						plan_id: this.state.plan_id,
+						run_date: run.date,
+					}),
+					headers: { "content-type": "application/json" },
+				}));
+				this.recordChild("shop", childName);
+				spawnedShops.add(childName);
+				ctx.stash({
+					plan_loaded: true,
+					meal_total: allMeals.length,
+					shop_total: allShops.length,
+					spawned_meals: [...spawnedMeals],
+					spawned_shops: [...spawnedShops],
+				} satisfies FinalizeFiberSnapshot);
+			} catch (err) {
+				console.warn(`[plan-agent] failed to spawn shop-agent for ${run.id}:`, err);
+			}
+		}
+
+		this.setState({ ...this.state, status: "finalized", last_action: "finalize" });
+		ctx.stash({
+			plan_loaded: true,
+			meal_total: allMeals.length,
+			shop_total: allShops.length,
+			spawned_meals: [...spawnedMeals],
+			spawned_shops: [...spawnedShops],
+			finalized: true,
+		} satisfies FinalizeFiberSnapshot);
+
+		return { mealsSpawned: spawnedMeals.size, shopsSpawned: spawnedShops.size };
+	}
+
+	/**
+	 * Phase 4 — recovery hook. Re-enters `runFinalizeSpawnFiber` with the
+	 * saved snapshot so already-spawned children are skipped.
+	 */
+	async onFiberRecovered(ctx: FiberRecoveryContext): Promise<void> {
+		if (ctx.name === "finalize_spawn") {
+			try {
+				await this.runFiber("finalize_spawn", async (inner) => {
+					if (ctx.snapshot != null && (inner as { snapshot: unknown | null }).snapshot == null) {
+						(inner as { stash(d: unknown): void }).stash(ctx.snapshot);
+					}
+					await this.runFinalizeSpawnFiber(
+						inner as { stash(d: unknown): void; snapshot: unknown | null },
+					);
+				});
+			} catch (err) {
+				console.warn(`[plan-agent] onFiberRecovered(finalize_spawn) failed:`, err);
+			}
+			return;
+		}
+		await super.onFiberRecovered(ctx);
 	}
 
 	private async routeArchive(): Promise<Response> {

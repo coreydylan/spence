@@ -3068,7 +3068,7 @@ const SLOT_SCHEMA = {
 	},
 };
 
-const PLAN_WORLD_TOOLS = [
+export const PLAN_WORLD_TOOLS = [
 	// Plan lifecycle
 	tool("plan_create", "Create or persist a plan. Pass {plan} for a pre-built MiseWeeklyPlanDraft, or {household_id, start_date, end_date, ...} to shape an empty draft.", {
 		type: "object",

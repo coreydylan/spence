@@ -85,6 +85,16 @@ binding = "MESH"
 network_id = "cf1:network"
 remote = true
 
+# Phase 3 — Workers AI binding for the chef-of-staff intent router.
+#
+# The /agent/chef route calls env.AI.run("@cf/meta/llama-3.2-3b-instruct", …)
+# at the top of the loop to classify each user message as free_chat,
+# workflow:onboard, workflow:plan, quick:save_preference, quick:add_to_pantry,
+# quick:add_equipment, or quick:set_tradition BEFORE we burn the heavy
+# mesh-claude bridge. Falls back to free_chat on any classifier failure.
+[ai]
+binding = "AI"
+
 [vars]
 BRIDGE_HOST = "100.96.0.10"
 BRIDGE_PORT = "8484"
@@ -92,6 +102,27 @@ BRIDGE_PORT = "8484"
 # BRIDGE_SECRET (HMAC) must be set via:
 #   wrangler secret put BRIDGE_SECRET --config wrangler.mise.toml
 # Field secret id: f1c21b51-3890-4cee-9f38-df1cb4b240a9 (claude-bridge-hmac-secret)
+
+# Phase 5 — Cloudflare AI Gateway routing (OPT-IN).
+#
+# When BOTH of the values below are uncommented, callMeshClaude wraps the
+# bridge fetch through https://gateway.ai.cloudflare.com/v1/<acct>/<name>/
+# for caching, rate limiting, cost dashboards, and observability. Until the
+# bridge daemon is exposed via a Cloudflare Tunnel (currently Tailscale-only),
+# leave these commented so the direct MESH path is used.
+#
+# One-time dashboard setup (see PHASE_5_AI_GATEWAY_REPORT.md):
+#   1. Cloudflare Dashboard → AI → AI Gateway → Create gateway → "spence-mesh"
+#   2. Configure cache TTL 60s + rate limit 60 req / 5 min per IP
+#   3. Uncomment the lines below + wrangler deploy
+#
+# AI_GATEWAY_ACCOUNT_ID = "8276973f31803dc6a1597c1396d64c4c"
+# AI_GATEWAY_NAME = "spence-mesh"
+# AI_GATEWAY_CACHE_TTL = "60"            # seconds; default 60
+# AI_GATEWAY_SKIP_CACHE_MARKER = "nonce" # body substring → cf-aig-skip-cache
+#
+# AI_GATEWAY_TOKEN (only for authenticated gateways) is a secret:
+#   wrangler secret put AI_GATEWAY_TOKEN --config wrangler.mise.toml
 
 # Cloudflare Workflows binding for the durable mise-graph planner pipeline.
 # Each phase (compose → audit → revise → polish → persist) is a checkpointable
@@ -106,6 +137,27 @@ BRIDGE_PORT = "8484"
 # binding = "PLANNER_WORKFLOW"
 # name = "spence-planner-workflow"
 # class_name = "PlannerWorkflow"
+
+# Phase 2 — Cloudflare Workflows for onboarding, planning, and post-meal
+# debriefs. Workflows are NOT durable_objects — they live under their own
+# binding kind and don't need a migration tag bump (only DOs do).
+#
+# Classes are exported from src/mise-graph-worker.ts (the worker's main
+# module) so wrangler can find them by `class_name`.
+[[workflows]]
+binding = "ONBOARDING_WORKFLOW"
+name = "spence-onboarding"
+class_name = "OnboardingWorkflow"
+
+[[workflows]]
+binding = "PLANNING_WORKFLOW"
+name = "spence-planning"
+class_name = "PlanningWorkflow"
+
+[[workflows]]
+binding = "COOK_DEBRIEF_WORKFLOW"
+name = "spence-cook-debrief"
+class_name = "CookSessionDebriefWorkflow"
 
 # DAILY MORNING-BRIEF CRON.
 #

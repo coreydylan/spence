@@ -42,6 +42,13 @@ declare global {
 			// type compiles before the bucket is provisioned; the photo route
 			// returns 503 when missing.
 			BRIGADE_PHOTOS?: R2Bucket;
+			// Phase 2 — Cloudflare Workflows bindings.
+			// Optional: when running against a deployment that hasn't yet
+			// rolled the [[workflows]] blocks, the binding is absent and
+			// workflow-spawning code paths short-circuit with a warning.
+			ONBOARDING_WORKFLOW?: Workflow;
+			PLANNING_WORKFLOW?: Workflow;
+			COOK_DEBRIEF_WORKFLOW?: Workflow;
 		}
 	}
 }

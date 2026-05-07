@@ -50,6 +50,13 @@ export { CookingLeadAgent } from "./mise-graph/agents/cooking-lead-agent";
 // durability + cross-restart resume.
 // export { PlannerWorkflow } from "./mise-graph/workflow-runner";
 
+// Phase 2 — Cloudflare Workflows. Each class is bound via [[workflows]]
+// in wrangler.mise.toml. Wrangler discovers the class via `class_name`
+// at the worker's main entrypoint, so the export must live here.
+export { OnboardingWorkflow } from "./workflows/onboarding-workflow";
+export { PlanningWorkflow } from "./workflows/planning-workflow";
+export { CookSessionDebriefWorkflow } from "./workflows/cook-debrief-workflow";
+
 const CORS_HEADERS: Record<string, string> = {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -75,6 +82,11 @@ export interface Env extends MiseGraphEnv {
 	// type compiles before the bucket has been provisioned. The photo
 	// upload route returns 503 when the binding is missing.
 	BRIGADE_PHOTOS?: R2Bucket;
+	// Phase 2 — Cloudflare Workflows bindings. Optional so older configs
+	// still typecheck; the trigger routes return 503 when missing.
+	ONBOARDING_WORKFLOW?: Workflow;
+	PLANNING_WORKFLOW?: Workflow;
+	COOK_DEBRIEF_WORKFLOW?: Workflow;
 }
 
 export default {
@@ -254,6 +266,52 @@ export default {
 				});
 			} catch (e) {
 				return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500);
+			}
+		}
+
+		// Phase 2 — Cloudflare Workflows trigger routes.
+		//
+		// Pattern:
+		//   POST /agent/workflow/:name/:id/start    — env[NAME].create({id, params})
+		//   POST /agent/workflow/:name/:id/events   — env[NAME].sendEvent({id, type, payload})
+		//   GET  /agent/workflow/:name/:id/status   — env[NAME].get(id).status()
+		//
+		// `name` ∈ { "onboarding", "planning", "cook_debrief" } and maps to
+		// the matching Workflow binding. The instance `id` is opaque to
+		// the worker (each workflow class owns its own naming convention —
+		// household_id for onboarding, plan_id for planning,
+		// cook_session_id for cook_debrief).
+		const wfMatch = matchWorkflowRoute(path);
+		if (wfMatch) {
+			const ns = pickWorkflowBinding(env, wfMatch.name);
+			if (!ns) {
+				return jsonResponse(
+					{ error: `workflow binding for "${wfMatch.name}" not bound on this worker` },
+					503,
+				);
+			}
+			try {
+				if (wfMatch.action === "start" && request.method === "POST") {
+					const body = (await request.json().catch(() => ({}))) as { params?: Record<string, unknown> };
+					const handle = await ns.create({ id: wfMatch.id, params: body.params ?? {} });
+					return jsonResponse({ ok: true, id: handle.id, status: await handle.status() });
+				}
+				if (wfMatch.action === "events" && request.method === "POST") {
+					const body = (await request.json().catch(() => ({}))) as { type?: string; payload?: unknown };
+					if (!body.type) return jsonResponse({ error: "type required" }, 400);
+					const handle = await ns.get(wfMatch.id);
+					await handle.sendEvent({ type: body.type, payload: body.payload });
+					return jsonResponse({ ok: true, id: wfMatch.id, sent: body.type });
+				}
+				if (wfMatch.action === "status" && request.method === "GET") {
+					const handle = await ns.get(wfMatch.id);
+					const status = await handle.status();
+					return jsonResponse({ ok: true, id: wfMatch.id, status });
+				}
+				return jsonResponse({ error: `unknown workflow action: ${wfMatch.action}` }, 404);
+			} catch (e) {
+				const message = e instanceof Error ? e.message : String(e);
+				return jsonResponse({ error: message }, 500);
 			}
 		}
 
@@ -520,6 +578,40 @@ function matchBridgeRoute(path: string, method: string): BridgeRoute | null {
 		}
 		default:
 			return null;
+	}
+}
+
+// ─── Phase 2 Workflow trigger routing helpers ─────────────────────────────
+
+interface WorkflowRouteMatch {
+	name: WorkflowName;
+	id: string;
+	action: "start" | "events" | "status";
+}
+
+type WorkflowName = "onboarding" | "planning" | "cook_debrief";
+
+function matchWorkflowRoute(path: string): WorkflowRouteMatch | null {
+	const prefix = "/agent/workflow/";
+	if (!path.startsWith(prefix)) return null;
+	const segments = path.slice(prefix.length).split("/").filter(Boolean);
+	if (segments.length !== 3) return null;
+	const [name, id, action] = segments;
+	if (!isWorkflowName(name)) return null;
+	if (action !== "start" && action !== "events" && action !== "status") return null;
+	if (!id) return null;
+	return { name, id, action };
+}
+
+function isWorkflowName(s: string): s is WorkflowName {
+	return s === "onboarding" || s === "planning" || s === "cook_debrief";
+}
+
+function pickWorkflowBinding(env: Env, name: WorkflowName): Workflow | undefined {
+	switch (name) {
+		case "onboarding":   return env.ONBOARDING_WORKFLOW;
+		case "planning":     return env.PLANNING_WORKFLOW;
+		case "cook_debrief": return env.COOK_DEBRIEF_WORKFLOW;
 	}
 }
 
