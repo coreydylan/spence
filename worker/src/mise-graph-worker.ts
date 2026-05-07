@@ -10,6 +10,7 @@ import { householdAgentName, planAgentName } from "./mise-graph/agents/base";
 import {
 	migrateBrigadeSchema,
 	migrateDailyBriefsSchema,
+	migrateOnboardingSchema,
 	migratePlanHealthSchema,
 	migrateShopRemindersSchema,
 } from "./mise-graph/schemas/migrations";
@@ -127,6 +128,26 @@ export default {
 			}
 			try {
 				const result = await migrateBrigadeSchema(env);
+				return jsonResponse({ ok: true, ...result });
+			} catch (e) {
+				return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500);
+			}
+		}
+
+		// Admin: Onboarding Phase A schema migration. Adds:
+		//   * mise_onboarding_state, mise_onboarding_responses,
+		//     mise_household_traits, mise_household_traditions
+		//   * ALTER TABLE mise_household_profiles ADD COLUMN
+		//     dinner_ritual / cook_frequency / pantry_intake_mode
+		// Idempotent — re-running is a no-op (CREATE IF NOT EXISTS + ALTERs
+		// are wrapped in try/catch for "duplicate column"). Gated on
+		// X-Spence-Admin.
+		if (path === "/mise-graph/admin/migrate-onboarding" && request.method === "POST") {
+			if (!request.headers.get("X-Spence-Admin")) {
+				return jsonResponse({ error: "X-Spence-Admin header required" }, 401);
+			}
+			try {
+				const result = await migrateOnboardingSchema(env);
 				return jsonResponse({ ok: true, ...result });
 			} catch (e) {
 				return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500);

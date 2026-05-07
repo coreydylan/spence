@@ -106,6 +106,12 @@ import {
 	type SkillOutcome,
 } from "./household-members";
 import {
+	answerOnboarding,
+	skipOnboarding,
+	startOnboarding,
+	statusOnboarding,
+} from "./onboarding";
+import {
 	getPresence,
 	listAvailableMembers,
 	pingPresence,
@@ -416,6 +422,12 @@ export async function callPlanWorldTool(
 		case "member_list_available": return await toolMemberListAvailable(args, env);
 		case "meal_set_attendance": return await toolMealSetAttendance(args, env);
 		case "meal_read_attendance": return await toolMealReadAttendance(args, env);
+
+		// ── Onboarding (Phase A) — tier-based progressive Q/A ─────────────
+		case "household_onboarding_start": return await toolOnboardingStart(args, env);
+		case "household_onboarding_answer": return await toolOnboardingAnswer(args, env);
+		case "household_onboarding_skip": return await toolOnboardingSkip(args, env);
+		case "household_onboarding_status": return await toolOnboardingStatus(args, env);
 
 		// ── Concept board (Wave 6) — Phase-1 inspiration sticky-notes ────
 		case "inspire_set_movement": return await toolInspireSetMovement(args, env);
@@ -2027,6 +2039,38 @@ function coerceMemberSafety(value: Record<string, unknown>): Partial<MemberSafet
 	return out;
 }
 
+// ─── Onboarding (Phase A) ──────────────────────────────────────────────────
+
+async function toolOnboardingStart(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const household_name = optionalString(args.household_name);
+	const result = await startOnboarding(env, { household_id, household_name });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolOnboardingAnswer(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const question_kind = requireString(args.question_kind, "question_kind");
+	const response_text = requireString(args.response_text, "response_text");
+	const member_id = optionalString(args.member_id);
+	const result = await answerOnboarding(env, { household_id, question_kind, response_text, member_id });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolOnboardingSkip(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const question_kind = requireString(args.question_kind, "question_kind");
+	const member_id = optionalString(args.member_id);
+	const result = await skipOnboarding(env, { household_id, question_kind, member_id });
+	return result as unknown as Record<string, unknown>;
+}
+
+async function toolOnboardingStatus(args: Record<string, unknown>, env: MiseGraphEnv): Promise<Record<string, unknown>> {
+	const household_id = requireString(args.household_id, "household_id");
+	const result = await statusOnboarding(env, { household_id });
+	return result as unknown as Record<string, unknown>;
+}
+
 // ─── Conversion + validation helpers ───────────────────────────────────────
 
 function sanitizePreview(preview: RipplePreview): Record<string, unknown> {
@@ -3207,6 +3251,42 @@ const PLAN_WORLD_TOOLS = [
 		properties: {
 			plan_id: { type: "string" },
 			slot: SLOT_SCHEMA,
+		},
+	}),
+
+	// ── Onboarding (Phase A) — progressive Q/A across depth tiers ──────────
+	tool("household_onboarding_start", "Begin tier-0 onboarding for a household. Idempotent — calling on a household that has already started returns the current state + next question without resetting. Returns {state, next_question, tier_progress}.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
+			household_name: { type: "string", description: "Optional display name for the household; mirrors to mise_household_profiles.display_name." },
+		},
+	}),
+	tool("household_onboarding_answer", "Record an answer to a tier question. The agent extracts inferred trait deltas from the answer per the question's mapping, advances the tier when all required questions in the tier are answered or skipped, and returns the next question (or null if the session quota is satisfied).", {
+		type: "object",
+		required: ["household_id", "question_kind", "response_text"],
+		properties: {
+			household_id: { type: "string" },
+			question_kind: { type: "string", description: "Stable identifier for the question (e.g. tier_1_dinner_ritual)." },
+			response_text: { type: "string", description: "User's answer. For forced-choice questions pass the option value (e.g. 'table')." },
+			member_id: { type: "string", description: "Optional — when the answer comes from a specific household member." },
+		},
+	}),
+	tool("household_onboarding_skip", "Record a skip for a question. No trait penalty; the question may resurface later. Required tier-0 questions cannot be skipped to advance the tier — but skipping an optional question always allows advancement.", {
+		type: "object",
+		required: ["household_id", "question_kind"],
+		properties: {
+			household_id: { type: "string" },
+			question_kind: { type: "string" },
+			member_id: { type: "string" },
+		},
+	}),
+	tool("household_onboarding_status", "Read-only snapshot: current state, all 7 traits with confidence, next-question preview, completion_pct (tiers complete / 5), and engagement_signal.", {
+		type: "object",
+		required: ["household_id"],
+		properties: {
+			household_id: { type: "string" },
 		},
 	}),
 

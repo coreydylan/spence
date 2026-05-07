@@ -79,6 +79,25 @@ function executeMutation(
 		return 0;
 	}
 
+	// ALTER TABLE … ADD COLUMN — append a new column to the table. Throw
+	// "duplicate column name" so callers using try/catch for idempotency
+	// behave like real D1.
+	if (/^alter\s+table\s+/i.test(sql)) {
+		const m = /^alter\s+table\s+([a-z_][a-z0-9_]*)\s+add\s+(?:column\s+)?([a-z_][a-z0-9_]*)\b[\s\S]*$/i.exec(sql);
+		if (!m) throw new Error(`mock-d1: cannot parse ALTER TABLE: ${sql}`);
+		const tableName = m[1];
+		const columnName = m[2];
+		const table = tables.get(tableName);
+		if (!table) throw new Error(`mock-d1: ALTER TABLE references unknown table ${tableName}`);
+		if (table.columns.includes(columnName)) {
+			throw new Error(`duplicate column name: ${columnName}`);
+		}
+		table.columns.push(columnName);
+		// Existing rows pick up the new column lazily (undefined) — same as
+		// SQLite's behavior with no DEFAULT clause.
+		return 0;
+	}
+
 	if (/^create\s+table/.test(lower)) {
 		const tableMatch = /create\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)\s*\(([\s\S]+)\)\s*$/i.exec(sql);
 		if (!tableMatch) throw new Error(`mock-d1: cannot parse CREATE TABLE: ${sql}`);
