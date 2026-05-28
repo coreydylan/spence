@@ -486,8 +486,12 @@ export interface ToolMap {
   household_onboarding_answer: {
     args: {
       household_id: string;
-      question_id: string;
-      answer: unknown;
+      // The worker tool's required fields are `question_kind` (stable id like
+      // "tier_1_dinner_ritual") and `response_text` (the user's answer string —
+      // for forced-choice questions, pass the option value e.g. "table").
+      question_kind: string;
+      response_text: string;
+      member_id?: string;
     };
     result: {
       next_question: ChefQuestion | null;
@@ -506,7 +510,7 @@ export interface ToolMap {
     };
   };
   household_onboarding_skip: {
-    args: { household_id: string; question_id: string; reason?: string };
+    args: { household_id: string; question_kind: string; member_id?: string };
     result: { next_question: ChefQuestion | null };
   };
   household_set_pantry_bulk: {

@@ -155,10 +155,25 @@ export default function OnboardingPage() {
     setBusy(true);
     try {
       if (step.tool === "household_onboarding_answer" && step.questionKind) {
-        await mcpClient("household_onboarding_answer", {
-          question_id: serverQuestionId ?? step.questionKind,
-          answer: opts.skip ? null : answer,
-        });
+        // Worker tool expects question_kind + response_text. (The original
+        // typed entry had question_id/answer which silently mismatched.)
+        const value = opts.skip ? null : answer;
+        const responseText =
+          value === null
+            ? ""
+            : typeof value === "string"
+              ? value
+              : JSON.stringify(value);
+        if (opts.skip) {
+          await mcpClient("household_onboarding_skip", {
+            question_kind: serverQuestionId ?? step.questionKind,
+          });
+        } else {
+          await mcpClient("household_onboarding_answer", {
+            question_kind: serverQuestionId ?? step.questionKind,
+            response_text: responseText,
+          });
+        }
       } else if (step.tool === "household_set_pantry_bulk") {
         await mcpClient("household_set_pantry_bulk", {
           text: typeof answer === "string" ? answer : "",

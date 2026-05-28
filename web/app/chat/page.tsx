@@ -129,6 +129,103 @@ export default function ChatPage() {
     }
   };
 
+  // ── Onboarding answer handler ─────────────────────────────────────────────
+  // Injected into <OnboardingQuestionCard onAnswer={...}/> when the chat
+  // surface renders an inline onboarding question. POSTs to /api/onboarding/
+  // answer which routes through the worker's household_onboarding_answer MCP
+  // tool, then appends the user's answer + next question (if any) as a new
+  // message pair so the conversation flows naturally.
+  const handleOnboardingAnswer = React.useCallback(
+    async ({ question_id, answer }: { question_id: string; answer: unknown }) => {
+      tapHaptic();
+      const answerText =
+        typeof answer === "string" ? answer : JSON.stringify(answer);
+      const userMsg: Message = { id: uid("u"), role: "user", text: answerText };
+      // Optimistically render the user's answer as a bubble so the UI doesn't
+      // freeze while the worker round-trips.
+      setMessages((prev) => [...prev, userMsg]);
+      setStickToBottom(true);
+
+      try {
+        const resp = await fetch("/api/onboarding/answer", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            question_kind: question_id,
+            response_text: answerText,
+          }),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid("a"),
+              role: "assistant",
+              text: `Hmm, couldn't record that — ${text}. Try again?`,
+              tools: [],
+              done: true,
+            },
+          ]);
+          return;
+        }
+        const result = (await resp.json()) as {
+          next_question?: unknown;
+          tier_advanced?: boolean;
+        };
+        if (result.next_question && typeof result.next_question === "object") {
+          const assistantMsg: Message = {
+            id: uid("a"),
+            role: "assistant",
+            text: "",
+            done: true,
+            tools: [
+              {
+                id: uid("ui"),
+                name: "onboarding_question",
+                status: "done",
+                ui: {
+                  component: "onboarding_question",
+                  props: { question: result.next_question },
+                },
+              },
+            ],
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+        } else {
+          // No more questions queued — the next chat turn will pick up where
+          // we are (tier advanced, ready_to_plan, etc.).
+          const text = result.tier_advanced
+            ? "Got it. Want me to plan some dinners?"
+            : "Got it.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid("a"),
+              role: "assistant",
+              text,
+              tools: [],
+              done: true,
+            },
+          ]);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid("a"),
+            role: "assistant",
+            text: `Network hiccup — ${msg}`,
+            tools: [],
+            done: true,
+          },
+        ]);
+      }
+    },
+    [],
+  );
+
   // ── Group consecutive same-author messages for shared-avatar layout ───────
   const groupFlags = React.useMemo(() => buildGroupFlags(messages), [messages]);
 
@@ -166,6 +263,7 @@ export default function ChatPage() {
                   <AssistantBubble
                     message={m}
                     showTyping={busy && i === messages.length - 1 && m.text === "" && m.tools.length === 0}
+                    onOnboardingAnswer={handleOnboardingAnswer}
                   />
                 </MessageGroup>
               );
@@ -192,9 +290,11 @@ export default function ChatPage() {
 function AssistantBubble({
   message,
   showTyping,
+  onOnboardingAnswer,
 }: {
   message: Extract<Message, { role: "assistant" }>;
   showTyping?: boolean;
+  onOnboardingAnswer?: (input: { question_id: string; answer: unknown }) => void;
 }) {
   // Show typing indicator pre-first-token
   if (showTyping) {
@@ -227,9 +327,15 @@ function AssistantBubble({
         const r = t.ui ? resolve(t.ui) : null;
         if (!r) return null;
         const { Component, props } = r;
+        // OnboardingQuestionCard needs an onAnswer wired or its Send button
+        // is a silent no-op. Inject the chat-level handler here.
+        const extraProps =
+          t.ui?.component === "onboarding_question" && onOnboardingAnswer
+            ? { onAnswer: onOnboardingAnswer }
+            : {};
         return (
           <div key={`${t.id}-ui`} className="-mx-2 animate-fade-up">
-            <Component {...props} />
+            <Component {...props} {...extraProps} />
           </div>
         );
       })}
@@ -256,54 +362,82 @@ function buildGroupFlags(messages: Message[]): GroupFlags[] {
 
 function applyEvent(message: Message, event: ChefEvent): Message {
   if (message.role !== "assistant") return message;
-  switch (event.kind) {
-    case "text":
-      return { ...message, text: message.text + event.delta };
-    case "tool_call_start":
+  // CRITICAL: every code path must return a Message. Returning undefined
+  // here puts undefined into the messages array and the next render crashes
+  // on m.id. Use a `kind` switch with a default that no-ops, not an
+  // exhaustive switch — the worker keeps adding event kinds and we don't
+  // want a dropped frame to nuke the whole chat.
+  const k = (event as { kind?: string }).kind;
+  switch (k) {
+    case "text": {
+      const delta = (event as { delta?: string }).delta ?? "";
+      return { ...message, text: message.text + delta };
+    }
+    case "tool_call_start": {
+      const e = event as { call_id: string; tool_name?: string; tool?: string };
       return {
         ...message,
         tools: [
           ...message.tools,
-          { id: event.call_id, name: event.tool_name, status: "running" },
+          { id: e.call_id, name: e.tool_name ?? e.tool ?? "tool", status: "running" },
         ],
       };
-    case "tool_call_result":
+    }
+    case "tool_call_result": {
+      const e = event as { call_id: string; ui_component?: UiComponent };
       return {
         ...message,
         tools: message.tools.map((t) =>
-          t.id === event.call_id
-            ? { ...t, status: "done", ui: event.ui_component }
+          t.id === e.call_id
+            ? { ...t, status: "done", ui: e.ui_component }
             : t,
         ),
       };
-    case "tool_call_error":
+    }
+    case "tool_call_error": {
+      const e = event as { call_id: string };
       return {
         ...message,
         tools: message.tools.map((t) =>
-          t.id === event.call_id ? { ...t, status: "error" } : t,
+          t.id === e.call_id ? { ...t, status: "error" } : t,
         ),
       };
-    case "ui_component":
+    }
+    case "ui_component": {
+      const e = event as { component: UiComponent };
       return {
         ...message,
         tools: [
           ...message.tools,
           {
             id: uid("ui"),
-            name: event.component.component,
+            name: e.component.component,
             status: "done",
-            ui: event.component,
+            ui: e.component,
           },
         ],
       };
+    }
     case "done":
       return { ...message, done: true };
-    case "error":
-      return { ...message, text: message.text + `\n\n_${event.error}_`, done: true };
+    case "error": {
+      const e = event as { error?: string; message?: string };
+      return {
+        ...message,
+        text: message.text + `\n\n_${e.error ?? e.message ?? "unknown error"}_`,
+        done: true,
+      };
+    }
+    // Phase 1 / 3 / future events that the chat surface doesn't render —
+    // explicitly no-op so the function doesn't return undefined.
     case "status":
-      return message;
     case "thinking_start":
-      // Worker pre-bridge marker; chat surface no-ops for now.
+    case "iteration_start":
+    case "code_execute_start":
+    case "code_execute_end":
+    case "intent":
+    case "workflow_spawned":
+    default:
       return message;
   }
 }
