@@ -1,0 +1,622 @@
+{
+  "id": "banana_bread",
+  "title": "Banana Bread",
+  "description": "A moist, tender quick bread with deep banana flavor. The riper the bananas, the better — use ones with brown spots. About an hour, with 15 minutes of active work.",
+  "composition": "baked_good",
+  "category": "quick_bread",
+
+  "tags": {
+    "meal": ["breakfast", "snack", "dessert"],
+    "diet": ["vegetarian"],
+    "cuisine": "american",
+    "sweet_savory": "sweet",
+    "effort": "weeknight",
+    "season": ["year-round"]
+  },
+
+  "yield": {
+    "canonical_amount": 1,
+    "canonical_unit": "loaf",
+    "canonical_item": "loaf",
+    "servings": 10,
+    "servings_unit": "slices",
+    "input_amount": null,
+    "input_unit": null,
+    "transformation_ratio": null,
+    "weight_grams": 900,
+    "input_weight_grams": null,
+    "pan_size": "9x5",
+    "display": "Makes 1 loaf (about 10 slices)"
+  },
+
+  "time": {
+    "prep_min": 15,
+    "cook_min": 55,
+    "active_min": 15,
+    "idle_min": 55,
+    "total_min": 70
+  },
+
+  "is_component": false,
+  "component_role": null,
+  "can_be_used_in": [],
+
+  "ingredient_groups": [
+    {
+      "label": "Main",
+      "slot": null,
+      "component_ref": null,
+      "items": [
+        {
+          "role": "fruit",
+          "canonical_name": "banana",
+          "consensus_qty": 3,
+          "unit": "whole",
+          "prep": "mashed (the browner the better)",
+          "required_state": null,
+          "importance": "core",
+          "frequency": 0.98,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "leavener",
+          "canonical_name": "baking soda",
+          "consensus_qty": 1,
+          "unit": "tsp",
+          "prep": null,
+          "required_state": null,
+          "importance": "core",
+          "frequency": 0.87,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "baking powder", "impact": "slightly less rise", "ratio": 3.0 }
+          ]
+        },
+        {
+          "role": "thickener",
+          "canonical_name": "all-purpose flour",
+          "consensus_qty": 1.5,
+          "unit": "cup",
+          "prep": null,
+          "required_state": null,
+          "importance": "core",
+          "frequency": 0.81,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "whole wheat flour", "impact": "denser, nuttier", "ratio": 1.0 },
+            { "name": "gluten-free flour blend", "impact": "add 1/2 tsp xanthan gum, bake 5 min longer", "ratio": 1.0 },
+            { "name": "almond flour", "impact": "moister, denser, reduce liquid by 2 tbsp", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "protein",
+          "canonical_name": "egg",
+          "consensus_qty": 2,
+          "unit": "whole",
+          "prep": null,
+          "required_state": "room_temp",
+          "importance": "expected",
+          "frequency": 0.72,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "flax egg", "impact": "vegan, slightly denser", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "fat",
+          "canonical_name": "butter",
+          "consensus_qty": 0.5,
+          "unit": "cup",
+          "prep": "melted and slightly cooled",
+          "required_state": "melted",
+          "importance": "expected",
+          "frequency": 0.68,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "coconut oil", "impact": "slightly firmer crumb", "ratio": 1.0 },
+            { "name": "neutral oil", "impact": "moister, longer shelf life", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "sweetener",
+          "canonical_name": "granulated sugar",
+          "consensus_qty": 0.75,
+          "unit": "cup",
+          "prep": null,
+          "required_state": null,
+          "importance": "expected",
+          "frequency": 0.65,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "brown sugar", "impact": "deeper flavor, chewier", "ratio": 1.0 },
+            { "name": "maple syrup", "impact": "reduce liquid by 2 tbsp elsewhere", "ratio": 0.75 }
+          ]
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "vanilla extract",
+          "consensus_qty": 1,
+          "unit": "tsp",
+          "prep": null,
+          "required_state": null,
+          "importance": "expected",
+          "frequency": 0.58,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "salt",
+          "consensus_qty": 0.5,
+          "unit": "tsp",
+          "prep": null,
+          "required_state": null,
+          "importance": "expected",
+          "frequency": 0.55,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "cinnamon",
+          "consensus_qty": 0.5,
+          "unit": "tsp",
+          "prep": null,
+          "required_state": null,
+          "importance": "optional",
+          "frequency": 0.32,
+          "slot_position": null,
+          "alternatives": []
+        }
+      ]
+    }
+  ],
+
+  "equipment": {
+    "full_inventory": [
+      { "item": "9x5 loaf pan", "count": 1, "purpose": "baking vessel", "required": true, "alternatives": ["8x4 loaf pan (check 5 min earlier)", "muffin tin (makes 12, bake 20 min)"], "step_indices": [1, 5] },
+      { "item": "large mixing bowl", "count": 1, "purpose": "main mixing bowl", "required": true, "alternatives": [], "step_indices": [2, 3, 4] },
+      { "item": "small bowl", "count": 1, "purpose": "melting butter", "required": true, "alternatives": ["mug", "small saucepan"], "step_indices": [1] },
+      { "item": "fork", "count": 1, "purpose": "mashing bananas", "required": true, "alternatives": ["potato masher"], "step_indices": [2] },
+      { "item": "whisk", "count": 1, "purpose": "combining wet ingredients", "required": true, "alternatives": ["fork", "wooden spoon"], "step_indices": [3] },
+      { "item": "rubber spatula", "count": 1, "purpose": "folding", "required": true, "alternatives": ["wooden spoon"], "step_indices": [4] },
+      { "item": "toothpick", "count": 1, "purpose": "doneness test", "required": true, "alternatives": ["cake tester", "thin knife"], "step_indices": [5] },
+      { "item": "wire rack", "count": 1, "purpose": "cooling", "required": false, "alternatives": ["plate"], "step_indices": [6] }
+    ],
+    "bowl_strategy": "one bowl (dry sprinkled into wet)",
+    "consumables": ["butter or parchment paper for greasing pan"]
+  },
+
+  "method_variants": [
+    {
+      "id": "oven_bake",
+      "label": "Oven Baked",
+      "method": "bake",
+      "is_default": true,
+      "equipment": ["oven", "9x5 loaf pan"],
+      "parameters": { "temp_f": 350, "time_min": { "min": 50, "max": 60 } },
+      "steps": [],
+      "total_time_min": 70,
+      "notes": "classic method, best crust"
+    }
+  ],
+  "default_method": "oven_bake",
+
+  "steps": [
+    {
+      "index": 1,
+      "phase": "mise_en_place",
+      "primary_action": { "verb": "preheat", "technique_ref": "preheat" },
+      "secondary_actions": [{ "verb": "grease", "technique_ref": null }],
+      "ingredient_refs": [],
+      "equipment_refs": ["oven", "9x5 loaf pan"],
+      "parameters": { "temperature_f": 350, "heat_level": null, "time": null, "pan_size": "9x5" },
+      "sensory_cues": [],
+      "completion_signal": null,
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": [],
+      "expected_outcome": null,
+      "idle_time_min": 10,
+      "parallel_task_hint": "While the oven heats, mash the bananas and melt the butter.",
+      "prose": "Preheat the oven to 350°F. Grease a 9x5 loaf pan (or line with parchment, leaving an inch of overhang so you can lift the loaf out later).",
+      "expanded_explanation": null,
+      "applies_to_variants": ["base"]
+    },
+    {
+      "index": 2,
+      "phase": "prep",
+      "primary_action": { "verb": "mash", "technique_ref": "mash" },
+      "secondary_actions": [],
+      "ingredient_refs": ["banana"],
+      "equipment_refs": ["large mixing bowl", "fork"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": [
+        { "type": "visual", "text": "mostly smooth with a few small lumps" },
+        { "type": "tactile", "text": "soft and spreadable" }
+      ],
+      "completion_signal": "mostly smooth, a few small lumps are fine",
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": [],
+      "expected_outcome": "The mixture will look liquidy — that's normal, ripe bananas have a lot of water.",
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": "In a large mixing bowl, mash 3 ripe bananas with a fork until mostly smooth — a few small lumps are fine. You should have about 1¼ cups of mashed banana.",
+      "expanded_explanation": "The riper the bananas, the sweeter and more flavorful your bread. Look for bananas with lots of brown spots — if they're still yellow, your bread will taste bland.",
+      "applies_to_variants": ["base"]
+    },
+    {
+      "index": 3,
+      "phase": "combine",
+      "primary_action": { "verb": "whisk", "technique_ref": "whisk" },
+      "secondary_actions": [],
+      "ingredient_refs": ["butter", "egg", "granulated sugar", "vanilla extract"],
+      "equipment_refs": ["whisk"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": [
+        { "type": "visual", "text": "fully combined and glossy" }
+      ],
+      "completion_signal": "fully combined and glossy",
+      "why_critical": true,
+      "causal_rule_ref": "hot_butter_cooks_eggs",
+      "pitfall_refs": [],
+      "expected_outcome": null,
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": "Whisk in the melted butter (it should be warm, not hot — hot butter will cook the eggs), then add the eggs, sugar, and vanilla. Whisk until everything is fully combined and glossy.",
+      "expanded_explanation": "Room-temp eggs blend in smoothly. Cold eggs will seize the butter into little clumps. If your eggs are cold, set them in a bowl of warm water for 5 minutes first.",
+      "applies_to_variants": ["base"]
+    },
+    {
+      "index": 4,
+      "phase": "combine",
+      "primary_action": { "verb": "fold", "technique_ref": "fold" },
+      "secondary_actions": [{ "verb": "sprinkle", "technique_ref": null }],
+      "ingredient_refs": ["all-purpose flour", "baking soda", "salt", "cinnamon"],
+      "equipment_refs": ["rubber spatula"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": [
+        { "type": "visual", "text": "no dry streaks of flour visible" }
+      ],
+      "completion_signal": "no dry streaks visible",
+      "why_critical": true,
+      "causal_rule_ref": "gluten_development",
+      "pitfall_refs": ["overmix_quick_bread"],
+      "expected_outcome": "The batter will be thick and slightly lumpy. That's what you want.",
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": "Sprinkle the flour, baking soda, salt, and cinnamon over the wet mixture. Fold with a spatula — stop as soon as you don't see dry streaks. Don't overmix; this keeps the crumb tender.",
+      "expanded_explanation": "Fold means cutting down through the center with a spatula, sweeping along the bottom, lifting, and folding over — NOT stirring in circles. Every extra stir develops more gluten, which turns tender quick bread into a tough, dense loaf.",
+      "applies_to_variants": ["base", "chocolate_chip", "vegan", "brown_butter"]
+    },
+    {
+      "index": 5,
+      "phase": "cook",
+      "primary_action": { "verb": "bake", "technique_ref": "bake" },
+      "secondary_actions": [{ "verb": "pour", "technique_ref": null }],
+      "ingredient_refs": [],
+      "equipment_refs": ["9x5 loaf pan", "oven", "toothpick"],
+      "parameters": {
+        "temperature_f": 350,
+        "heat_level": null,
+        "time": { "min": 50, "max": 60 },
+        "pan_size": "9x5"
+      },
+      "sensory_cues": [
+        { "type": "visual", "text": "deep golden brown top" },
+        { "type": "visual", "text": "pulls away from pan edges" },
+        { "type": "tactile", "text": "toothpick inserted in center comes out clean or with a few moist crumbs" },
+        { "type": "olfactory", "text": "the kitchen smells strongly of banana" }
+      ],
+      "completion_signal": "toothpick comes out clean or with a few moist crumbs",
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": ["overbake_quick_bread"],
+      "expected_outcome": null,
+      "idle_time_min": 55,
+      "parallel_task_hint": "While it bakes, clean up and set out a wire rack.",
+      "prose": "Pour the batter into the prepared pan and smooth the top. Bake 50-60 minutes, until the top is deep golden brown, the loaf has pulled away from the pan edges, and a toothpick in the center comes out with a few moist crumbs (but no wet batter).",
+      "expanded_explanation": "If the top browns before the center is done (around 40 min), tent loosely with foil for the rest of the bake.",
+      "applies_to_variants": ["base"]
+    },
+    {
+      "index": 6,
+      "phase": "rest",
+      "primary_action": { "verb": "cool", "technique_ref": "cool" },
+      "secondary_actions": [],
+      "ingredient_refs": [],
+      "equipment_refs": ["wire rack"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": { "min": 15, "max": 25 }, "pan_size": null },
+      "sensory_cues": [
+        { "type": "tactile", "text": "cool enough to handle" }
+      ],
+      "completion_signal": "cool enough to handle before slicing",
+      "why_critical": true,
+      "causal_rule_ref": "carryover_cooking_baked_goods",
+      "pitfall_refs": ["slice_hot_bread"],
+      "expected_outcome": null,
+      "idle_time_min": 25,
+      "parallel_task_hint": null,
+      "prose": "Let the loaf cool in the pan for 10 minutes, then turn it out onto a wire rack. Wait at least 15 more minutes before slicing — hot quick breads are gummy and fall apart. Serve warm or at room temperature.",
+      "expanded_explanation": null,
+      "applies_to_variants": ["base"]
+    }
+  ],
+
+  "variations": [
+    {
+      "id": "chocolate_chip",
+      "label": "Chocolate Chip",
+      "impact": "adds sweetness and melty pockets",
+      "step_insertions": [],
+      "step_modifications": [
+        {
+          "step_index": 4,
+          "prose_append": "Fold in ¾ cup chocolate chips with the last few folds."
+        }
+      ],
+      "step_skips": [],
+      "ingredient_additions": [
+        {
+          "role": "sweetener",
+          "canonical_name": "chocolate chips",
+          "consensus_qty": 0.75,
+          "unit": "cup",
+          "prep": null,
+          "required_state": null,
+          "importance": "core",
+          "frequency": 1.0,
+          "slot_position": null,
+          "alternatives": []
+        }
+      ],
+      "ingredient_swaps": [],
+      "recipe_count": 12
+    },
+    {
+      "id": "vegan",
+      "label": "Vegan",
+      "impact": "no eggs or dairy",
+      "step_insertions": [],
+      "step_modifications": [],
+      "step_skips": [],
+      "ingredient_additions": [],
+      "ingredient_swaps": [
+        { "from": "egg", "to": "flax egg" },
+        { "from": "butter", "to": "coconut oil" }
+      ],
+      "recipe_count": 12
+    },
+    {
+      "id": "brown_butter",
+      "label": "Brown Butter",
+      "impact": "nuttier, deeper flavor",
+      "step_insertions": [
+        {
+          "insert_before_index": 3,
+          "step": {
+            "index": 3,
+            "phase": "prep",
+            "primary_action": { "verb": "brown", "technique_ref": "brown_butter" },
+            "secondary_actions": [],
+            "ingredient_refs": ["butter"],
+            "equipment_refs": ["small saucepan"],
+            "parameters": { "temperature_f": null, "heat_level": "medium", "time": { "min": 4, "max": 6 }, "pan_size": null },
+            "sensory_cues": [
+              { "type": "visual", "text": "foamy, then subsides to amber" },
+              { "type": "olfactory", "text": "nutty, toasted smell" }
+            ],
+            "completion_signal": "amber color, nutty smell",
+            "why_critical": true,
+            "causal_rule_ref": "maillard_butter",
+            "pitfall_refs": ["burn_butter"],
+            "expected_outcome": "You'll see brown specks form on the bottom — that's the milk solids, which is where the flavor lives.",
+            "idle_time_min": null,
+            "parallel_task_hint": null,
+            "prose": "Melt ½ cup butter in a small saucepan over medium heat. Once melted, it will foam up, then subside. Keep swirling — you'll see brown specks form on the bottom and the butter will smell nutty (4-6 minutes). Immediately pour into a heat-safe bowl to stop the cooking. Let cool 5 minutes.",
+            "expanded_explanation": null,
+            "applies_to_variants": ["brown_butter"]
+          }
+        }
+      ],
+      "step_modifications": [
+        { "step_index": 3, "ingredient_swap": { "from": "butter", "to": "brown butter" } }
+      ],
+      "step_skips": [],
+      "ingredient_additions": [],
+      "ingredient_swaps": [{ "from": "butter", "to": "brown butter" }],
+      "recipe_count": 10
+    }
+  ],
+
+  "sub_recipes": [],
+
+  "context_hooks": [
+    {
+      "trigger": { "step_index": 4, "ingredient_present": null, "user_state": "first_time_folding" },
+      "card_type": "technique",
+      "content": "Fold = cut down through the center with a spatula, sweep along the bottom, lift and fold over — NOT stirring in circles. This keeps air in the batter.",
+      "why": "Overmixing = tough, dense crumb."
+    },
+    {
+      "trigger": { "step_index": 5, "ingredient_present": null, "user_state": null },
+      "card_type": "hook",
+      "content": "Tent with foil if the top gets too dark before the center is done (around 40 min).",
+      "why": "Common pitfall — top browns before center cooks."
+    }
+  ],
+
+  "lifecycle": {
+    "make_ahead": {
+      "can_make_ahead": true,
+      "prep_ahead_days": 1,
+      "partial_prep_ahead": "can be baked a day before and stored at room temp",
+      "improves_with_time": true,
+      "improves_note": "flavor deepens overnight as the banana fully permeates the crumb"
+    },
+    "serving": {
+      "serve_temperature": "warm",
+      "serve_immediately": false,
+      "holds_well": true,
+      "holds_duration_hours": 6,
+      "garnish_timing": null
+    },
+    "leftovers": {
+      "generates_leftovers": true,
+      "storage": [
+        {
+          "location": "counter",
+          "container": "airtight_container",
+          "duration_days": 3,
+          "duration_max_days": 4,
+          "notes": "let cool completely before sealing — trapped steam makes the top gummy"
+        },
+        {
+          "location": "fridge",
+          "container": "airtight_container",
+          "duration_days": 5,
+          "duration_max_days": 7,
+          "notes": "refrigeration extends life but can dry it out — wrap tightly"
+        }
+      ],
+      "reheat_methods": [
+        {
+          "method": "toaster",
+          "temperature_f": null,
+          "duration_min": 2,
+          "instructions": "toast slices for 1-2 minutes until edges are crisp",
+          "serving_tip": "spread with butter while warm"
+        },
+        {
+          "method": "microwave",
+          "temperature_f": null,
+          "duration_min": 0.3,
+          "instructions": "microwave a slice 15-20 seconds",
+          "serving_tip": "don't overdo it — microwave makes bread tough quickly"
+        },
+        {
+          "method": "oven",
+          "temperature_f": 300,
+          "duration_min": 10,
+          "instructions": "wrap loaf in foil, warm at 300°F for 10 minutes",
+          "serving_tip": "best for reheating the whole loaf"
+        }
+      ],
+      "freezer": {
+        "can_freeze": true,
+        "freeze_duration_months": 3,
+        "freeze_prep": "cool completely, wrap tightly in plastic wrap, then in foil or a freezer bag",
+        "thaw_method": "overnight on counter, still wrapped, OR toast slices directly from frozen",
+        "quality_note": "texture holds up well; slight moisture loss after 2+ months",
+        "freeze_portions": "slice first, wrap individual slices — easier to grab one at a time"
+      },
+      "refresh_tips": [
+        "toast slices for best texture",
+        "spread with butter, cream cheese, or nut butter while warm"
+      ],
+      "second_day_dishes": [
+        "use stale slices for French toast",
+        "crumble into yogurt or ice cream",
+        "turn into bread pudding"
+      ],
+      "safety_notes": []
+    }
+  },
+
+  "allergens": {
+    "contains": ["gluten", "wheat", "dairy", "eggs"],
+    "may_contain": [],
+    "free_of_certifications": []
+  },
+
+  "nutrition": {
+    "per_serving": {
+      "calories": 245,
+      "protein_g": 3.2,
+      "fat_g": 11,
+      "saturated_fat_g": 6.5,
+      "carbs_g": 34,
+      "fiber_g": 1.5,
+      "sugar_g": 18,
+      "sodium_mg": 220,
+      "cholesterol_mg": 55
+    },
+    "serving_size_g": 90,
+    "is_estimate": true,
+    "data_source": "derived"
+  },
+
+  "difficulty": {
+    "overall": 2,
+    "knife_skills": 1,
+    "timing_sensitivity": 2,
+    "technique_complexity": 2,
+    "active_attention": 1,
+    "equipment_dependency": 2,
+    "recovery_tolerance": 4,
+    "notes": "The main challenge is not overmixing — stop folding as soon as the flour disappears. Otherwise very forgiving."
+  },
+
+  "troubleshooting": [
+    {
+      "symptom": "bread is gummy or wet in the center",
+      "likely_causes": ["underbaked", "sliced while still hot", "too much banana"],
+      "fix": "bake 5-10 min longer next time and check with toothpick; always wait 15 min before slicing",
+      "prevention": "test doneness with a toothpick in the very center, not the edges"
+    },
+    {
+      "symptom": "bread is dense and tough",
+      "likely_causes": ["overmixed the batter", "old baking soda"],
+      "fix": "nothing to fix this loaf; next time fold until JUST combined and check baking soda is fresh",
+      "prevention": "stop folding the moment no dry streaks show"
+    },
+    {
+      "symptom": "top burned before center cooked",
+      "likely_causes": ["oven runs hot", "pan too small (batter too deep)"],
+      "fix": "tent with foil for the rest of the bake",
+      "prevention": "tent at 40 min if the top is already dark"
+    },
+    {
+      "symptom": "bread sunk in the middle",
+      "likely_causes": ["opened oven during bake", "pulled it out too early"],
+      "fix": "can't fix once sunk, but still tastes fine",
+      "prevention": "don't open the oven before 45 min; always verify with toothpick"
+    },
+    {
+      "symptom": "bland flavor",
+      "likely_causes": ["bananas weren't ripe enough", "skipped salt"],
+      "fix": "spread with salted butter, add a pinch of salt on top when serving",
+      "prevention": "use bananas with lots of brown spots; salt brings out sweetness"
+    }
+  ],
+
+  "success_indicators": [
+    { "dimension": "appearance", "description": "deeply golden-brown top with a visible crack down the middle" },
+    { "dimension": "appearance", "description": "loaf pulls cleanly away from the pan edges" },
+    { "dimension": "texture", "description": "moist but fully set crumb, not gummy or wet" },
+    { "dimension": "texture", "description": "tender, not tough or dense" },
+    { "dimension": "flavor", "description": "strong banana flavor balanced with subtle warmth from cinnamon" },
+    { "dimension": "aroma", "description": "kitchen smells distinctly of banana while baking" }
+  ],
+
+  "pairings": [
+    { "category": "beverage", "name": "strong black coffee", "reason": "bitterness balances the sweetness", "recipe_ref": null },
+    { "category": "beverage", "name": "cold milk", "reason": "classic pairing, cuts the richness", "recipe_ref": null },
+    { "category": "topping", "name": "salted butter", "reason": "salt enhances banana flavor", "recipe_ref": null },
+    { "category": "topping", "name": "cream cheese", "reason": "tang complements sweetness", "recipe_ref": null },
+    { "category": "topping", "name": "peanut butter or almond butter", "reason": "protein + richness for breakfast", "recipe_ref": null },
+    { "category": "side", "name": "fresh berries", "reason": "acidity cuts through the richness", "recipe_ref": null }
+  ],
+
+  "_internal": {
+    "source_recipe_ids": [],
+    "confidence_score": 0.89,
+    "corpus_count": 75,
+    "last_computed": "2026-04-05T08:00:00Z",
+    "reviewed_at": "2026-04-05T08:00:00Z",
+    "reviewer": "hand_crafted",
+    "status": "reviewed"
+  }
+}

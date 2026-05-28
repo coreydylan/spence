@@ -1,0 +1,189 @@
+{
+  "name": "Basic Chia Seed Pudding",
+  "source": "eatingbirdfood.com",
+  "description": "A creamy, make-ahead pudding that requires zero cooking",
+  "yield": "2 cups (2 servings)",
+  "timing": {
+    "prep_minutes": 5,
+    "cook_minutes": 0,
+    "total_minutes": 5,
+    "notes": "Plus 1-2 hours (or overnight) refrigeration to set"
+  },
+
+  "equipment": [
+    {
+      "item": "Mason jar with lid OR medium bowl with cover",
+      "required": true,
+      "notes": "Mason jar makes mixing easier"
+    },
+    {
+      "item": "Measuring cups and spoons",
+      "required": true,
+      "notes": null
+    },
+    {
+      "item": "Whisk or fork",
+      "required": true,
+      "notes": "For breaking up clumps"
+    },
+    {
+      "item": "Serving bowls",
+      "required": true,
+      "notes": "2 bowls for serving"
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "chia seeds",
+      "quantity_display": "6 tablespoons",
+      "quantity_volume": "6 tablespoons",
+      "quantity_weight_g": 60,
+      "prep": null,
+      "notes": null,
+      "category": "pantry"
+    },
+    {
+      "item": "plant milk",
+      "quantity_display": "2 cups",
+      "quantity_volume": "2 cups",
+      "quantity_weight_g": 480,
+      "prep": null,
+      "notes": "Coconut, almond, or cashew milk work well",
+      "category": "dairy"
+    },
+    {
+      "item": "vanilla extract",
+      "quantity_display": "1/2 teaspoon",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 2,
+      "prep": null,
+      "notes": null,
+      "category": "pantry"
+    },
+    {
+      "item": "maple syrup",
+      "quantity_display": "1 tablespoon",
+      "quantity_volume": "1 tablespoon",
+      "quantity_weight_g": 20,
+      "prep": null,
+      "notes": "Optional - can substitute honey or omit",
+      "category": "pantry"
+    },
+    {
+      "item": "fresh berries",
+      "quantity_display": "for topping",
+      "quantity_volume": "1/2 cup",
+      "quantity_weight_g": 75,
+      "prep": "washed",
+      "notes": "Blueberries and strawberries recommended",
+      "category": "produce"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: get out a mason jar with lid (or a medium bowl with cover), measuring cups and spoons, a fork or whisk, and a small bowl for berries.",
+      "outputs": ["staging area ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 1,
+      "notes": "Mason jar makes mixing and storing easier - you can shake it"
+    },
+    {
+      "id": 2,
+      "instruction": "Measure chia seeds into the mason jar or bowl",
+      "outputs": ["measured chia seeds"],
+      "container": "jar with lid",
+      "station": "measuring",
+      "time_minutes": 0.5,
+      "notes": null
+    },
+    {
+      "id": 3,
+      "instruction": "Measure milk, maple syrup, and vanilla extract - can add directly to jar or have ready in measuring cup",
+      "outputs": ["wet ingredients"],
+      "container": "measuring cup",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": null
+    },
+    {
+      "id": 4,
+      "instruction": "Wash berries and place in small bowl. Set aside in refrigerator for topping.",
+      "outputs": ["washed berries"],
+      "container": "small bowl",
+      "station": "sink",
+      "time_minutes": 1,
+      "notes": "Can prep ahead and refrigerate"
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Add milk, maple syrup, and vanilla to the jar with chia seeds. If using a mason jar, secure lid and shake vigorously. If using a bowl, whisk well to combine.",
+      "time_minutes": 1,
+      "depends_on": [],
+      "uses_outputs": ["measured chia seeds", "wet ingredients"],
+      "cues": {
+        "visual": "Mixture is evenly combined, no dry clumps of chia",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 2,
+      "instruction": "Let mixture sit for 5 minutes at room temperature",
+      "time_minutes": 5,
+      "depends_on": [1],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Chia seeds beginning to absorb liquid and swell",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 3,
+      "instruction": "Stir or shake again to break up any clumps that have formed",
+      "time_minutes": 0.5,
+      "depends_on": [2],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "No clumps, evenly distributed seeds",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "This step is important - clumps won't break up once fully set"
+    },
+    {
+      "id": 4,
+      "instruction": "Cover and refrigerate for 1-2 hours or overnight until set to a pudding-like consistency",
+      "time_minutes": 60,
+      "depends_on": [3],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Thick, pudding-like consistency. Seeds are fully hydrated and gel-like.",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Divide pudding between two bowls. Top with fresh berries. Can also add: sliced banana, granola, nut butter, coconut flakes, or cacao nibs.",
+    "make_ahead": "This IS a make-ahead recipe. Prep the night before for easy breakfast.",
+    "storage": "Keeps refrigerated in an airtight container for up to 5 days. Stir before serving as it may thicken further."
+  },
+
+  "notes": [
+    "Full-fat coconut milk makes the creamiest pudding",
+    "If too thick after setting, stir in a splash more milk",
+    "Can be portioned into individual jars for grab-and-go breakfast"
+  ]
+}

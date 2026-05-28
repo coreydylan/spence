@@ -1,0 +1,68 @@
+---
+import TempuraStory from '../components/TempuraStory.tsx';
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0807" />
+    <title>Tempura isn't Japanese — Spence Atlas</title>
+    <meta name="description" content="A medieval Catholic fasting rule, a Portuguese ship in 1543, and a Jewish exodus in 1492 — how the same Iberian kitchen quietly built two national dishes. From Spence Atlas." />
+    <link rel="canonical" href="https://atlas.cookspence.com/" />
+    <meta property="og:title" content="Tempura isn't Japanese." />
+    <meta property="og:description" content="One Iberian kitchen. Two religious calendars. Two diasporas. Two national dishes — one Japanese, one British — that share everything and look nothing alike." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://atlas.cookspence.com/" />
+    <meta property="og:image" content="https://atlas.cookspence.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tempura isn't Japanese." />
+    <meta name="twitter:description" content="One Iberian kitchen. Two religious calendars. Two diasporas. Two national dishes that share everything and look nothing alike." />
+    <meta name="twitter:image" content="https://atlas.cookspence.com/og.png" />
+    <link rel="preconnect" href="https://rsms.me/" />
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <style is:global>
+      :root { color-scheme: dark; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        background: #0A0807;
+        color: #F7EDE2;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-feature-settings: 'cv11', 'ss01', 'ss03';
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior-y: contain;
+      }
+      * { box-sizing: border-box; }
+      @keyframes captionPop {
+        0%   { opacity: 0; transform: translateX(-50%) translateY(4px); }
+        100% { opacity: 0.82; transform: translateX(-50%) translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+      a:focus-visible, button:focus-visible {
+        outline: 2px solid #F4A23C; outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <TempuraStory client:only="react" />
+
+    <noscript>
+      <article style="max-width: 680px; margin: 80px auto; padding: 0 24px; color: #F7EDE2; font-family: Georgia, serif; line-height: 1.65;">
+        <h1>Tempura isn't Japanese.</h1>
+        <p>This page is an interactive scrollytelling essay that needs JavaScript. The short version:</p>
+        <p>Tempura is Portuguese Catholic fasting food. Medieval Iberian kitchens fried battered vegetables on the four annual fasting weeks the Catholic church called <em>quattuor tempora</em>. Portuguese Jesuits brought the technique to Japan in 1543. When Japan closed its borders in 1639, the recipe stayed and the word — straight from Latin — became 天ぷら.</p>
+        <p>The other branch is fish and chips. Sephardic Jews living in Iberia for eight centuries cooked in the same kitchens and used the same batter to fry fish ahead of Shabbat. After their expulsion in 1492, they carried the technique to London. By 1860 an Ashkenazi shopkeeper named Joseph Malin paired the cold Sephardic fried fish with Belgian-style chips. Britain has been claiming it as a national dish ever since.</p>
+        <p>One Iberian kitchen. Two religions. Two diasporas. Two national dishes. Visit <a href="/explore">/explore</a> for the full Meatball Atlas.</p>
+      </article>
+    </noscript>
+  </body>
+</html>

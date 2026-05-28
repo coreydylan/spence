@@ -1,0 +1,378 @@
+{
+  "name": "Baked Japanese Sweet Potatoes with Miso Tahini Butter",
+  "source": "rainbowplantlife.com",
+  "description": "Caramelized Japanese sweet potatoes topped with umami-rich miso tahini butter",
+  "yield": "4 servings",
+  "timing": {
+    "prep_minutes": 10,
+    "cook_minutes": 135,
+    "total_minutes": 145,
+    "notes": "Includes 45-60 minutes passive time in turned-off oven for caramelization"
+  },
+
+  "equipment": [
+    {
+      "item": "Baking sheet",
+      "required": true,
+      "notes": "Line with parchment paper for easy cleanup"
+    },
+    {
+      "item": "Parchment paper",
+      "required": false,
+      "alternative": "Place potatoes directly on oven rack"
+    },
+    {
+      "item": "Sharp knife",
+      "required": true,
+      "notes": "For piercing potatoes"
+    },
+    {
+      "item": "Medium mixing bowl",
+      "required": true,
+      "notes": "For making compound butter"
+    },
+    {
+      "item": "Fork or whisk",
+      "required": true,
+      "notes": "For mashing butter mixture"
+    },
+    {
+      "item": "Microplane or zester",
+      "required": true,
+      "notes": "For lime zest"
+    },
+    {
+      "item": "Citrus juicer",
+      "required": false,
+      "alternative": "Squeeze by hand"
+    },
+    {
+      "item": "Small skillet",
+      "required": false,
+      "alternative": "Buy pre-toasted sesame seeds"
+    },
+    {
+      "item": "Measuring spoons",
+      "required": true,
+      "notes": null
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "Japanese sweet potatoes",
+      "quantity_display": "2 pounds",
+      "quantity_volume": "4 medium potatoes",
+      "quantity_weight_g": 900,
+      "prep": "scrubbed clean",
+      "notes": "Purple skin, white/yellow flesh - not orange American sweet potatoes",
+      "category": "produce"
+    },
+    {
+      "item": "vegan butter",
+      "quantity_display": "5 tablespoons",
+      "quantity_volume": "5 tablespoons",
+      "quantity_weight_g": 70,
+      "prep": "softened at room temperature",
+      "notes": "Can substitute regular butter",
+      "category": "dairy"
+    },
+    {
+      "item": "white miso",
+      "quantity_display": "1 tablespoon",
+      "quantity_volume": "1 tablespoon plus more to taste",
+      "quantity_weight_g": 18,
+      "prep": null,
+      "notes": "White (shiro) miso is milder - adjust to taste",
+      "category": "pantry"
+    },
+    {
+      "item": "tahini",
+      "quantity_display": "2 tablespoons",
+      "quantity_volume": "2 tablespoons",
+      "quantity_weight_g": 30,
+      "prep": null,
+      "notes": "Stir well before measuring",
+      "category": "pantry"
+    },
+    {
+      "item": "lime",
+      "quantity_display": "1/2 medium",
+      "quantity_volume": "1 1/2 tablespoons juice + zest",
+      "quantity_weight_g": 35,
+      "prep": "zested and juiced",
+      "notes": "Need both zest and juice",
+      "category": "produce"
+    },
+    {
+      "item": "toasted sesame oil",
+      "quantity_display": "1 teaspoon",
+      "quantity_volume": "1 teaspoon plus more to taste",
+      "quantity_weight_g": 5,
+      "prep": null,
+      "notes": "Must be toasted sesame oil, not plain",
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "agave nectar",
+      "quantity_display": "1/2 to 1 teaspoon",
+      "quantity_volume": "1/2 to 1 teaspoon",
+      "quantity_weight_g": 5,
+      "prep": null,
+      "notes": "Or maple syrup - balances the miso",
+      "category": "pantry"
+    },
+    {
+      "item": "red pepper flakes",
+      "quantity_display": "a few pinches",
+      "quantity_volume": "1/8 teaspoon",
+      "quantity_weight_g": 0.3,
+      "prep": null,
+      "notes": null,
+      "category": "spices"
+    },
+    {
+      "item": "sesame seeds",
+      "quantity_display": "1 tablespoon",
+      "quantity_volume": "1 tablespoon",
+      "quantity_weight_g": 9,
+      "prep": "toasted",
+      "notes": "Toast yourself or buy pre-toasted",
+      "category": "pantry"
+    },
+    {
+      "item": "flaky sea salt",
+      "quantity_display": "for finishing",
+      "quantity_volume": "pinches",
+      "quantity_weight_g": 1,
+      "prep": null,
+      "notes": "Maldon or similar",
+      "category": "spices"
+    },
+    {
+      "item": "fresh cilantro",
+      "quantity_display": "1/2 cup leaves",
+      "quantity_volume": "1/2 cup",
+      "quantity_weight_g": 15,
+      "prep": "leaves picked",
+      "notes": null,
+      "category": "produce"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: get out a medium bowl for the compound butter, a small bowl for garnishes, your zester, and measuring spoons. Set the butter out to soften if not already.",
+      "outputs": ["staging area ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 2,
+      "notes": "Soft butter is essential for smooth compound butter"
+    },
+    {
+      "id": 2,
+      "instruction": "Scrub the sweet potatoes under running water to remove any dirt. Pat dry.",
+      "outputs": ["clean potatoes"],
+      "container": "counter",
+      "station": "sink",
+      "time_minutes": 2,
+      "notes": "Japanese sweet potatoes have edible skin"
+    },
+    {
+      "id": 3,
+      "instruction": "Zest half of the lime into the medium bowl",
+      "outputs": ["lime zest"],
+      "container": "medium bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Only need zest from half the lime"
+    },
+    {
+      "id": 4,
+      "instruction": "Juice the lime half (about 1 1/2 tablespoons) and add to the bowl with the zest",
+      "outputs": ["lime juice"],
+      "container": "medium bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": null
+    },
+    {
+      "id": 5,
+      "instruction": "Add softened butter, tahini, miso paste, toasted sesame oil, agave, and red pepper flakes to the bowl with the lime",
+      "outputs": ["butter mixture ingredients"],
+      "container": "medium bowl",
+      "station": "measuring",
+      "time_minutes": 2,
+      "notes": "All compound butter ingredients go in the same bowl"
+    },
+    {
+      "id": 6,
+      "instruction": "Pick cilantro leaves from stems and place in small bowl with sesame seeds. Set aside for garnishing.",
+      "outputs": ["garnish mixture"],
+      "container": "small bowl",
+      "station": "knife",
+      "time_minutes": 2,
+      "notes": "Everything for the final garnish together"
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Preheat oven to 375°F (190°C)",
+      "time_minutes": 10,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Oven indicator shows preheated",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 2,
+      "instruction": "Lightly slash or prick the sweet potatoes several times with a sharp knife to allow steam to escape",
+      "time_minutes": 1,
+      "depends_on": [],
+      "uses_outputs": ["clean potatoes"],
+      "cues": {
+        "visual": "4-5 small slits on each potato",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "This prevents potatoes from bursting in the oven"
+    },
+    {
+      "id": 3,
+      "instruction": "Place potatoes on parchment-lined baking sheet (or directly on oven rack with a pan below to catch drips)",
+      "time_minutes": 1,
+      "depends_on": [1, 2],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 4,
+      "instruction": "Bake potatoes: 60 minutes for small, 75 minutes for medium, 85-90 minutes for large. Potatoes should be completely soft when pierced.",
+      "time_minutes": 75,
+      "depends_on": [3],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Skin is slightly wrinkled, caramelized syrup may leak from slits",
+        "audio": null,
+        "aroma": "Sweet, caramelized smell"
+      },
+      "warnings": "Size varies - test with a knife for doneness"
+    },
+    {
+      "id": 5,
+      "instruction": "Turn off oven but keep potatoes inside with door closed for 45-60 minutes. This caramelizes the natural sugars.",
+      "time_minutes": 50,
+      "depends_on": [4],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Potatoes will look more wrinkled, may have caramelized syrup pooled around them",
+        "audio": null,
+        "aroma": "Intense sweet potato caramel aroma"
+      },
+      "warnings": "This step transforms good sweet potatoes into amazing ones - don't skip it"
+    },
+    {
+      "id": 6,
+      "instruction": "While potatoes rest in oven, make the compound butter: mash all ingredients in the medium bowl with a fork until very smooth and well combined",
+      "time_minutes": 3,
+      "depends_on": [],
+      "uses_outputs": ["butter mixture ingredients", "lime zest", "lime juice"],
+      "cues": {
+        "visual": "Smooth, creamy mixture with no lumps of miso",
+        "audio": null,
+        "aroma": "Nutty, savory, with hint of lime"
+      },
+      "warnings": null
+    },
+    {
+      "id": 7,
+      "instruction": "Taste the compound butter and adjust: add more miso for umami, more lime juice for brightness, or more sesame oil for nuttiness",
+      "time_minutes": 1,
+      "depends_on": [6],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": null
+    },
+    {
+      "id": 8,
+      "instruction": "If butter has become too soft/melty, refrigerate for 15-20 minutes until spreadable consistency",
+      "time_minutes": 0,
+      "depends_on": [7],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Butter holds its shape when scooped but spreads easily",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Optional step - only if butter is too runny"
+    },
+    {
+      "id": 9,
+      "instruction": "If toasting your own sesame seeds: add to dry skillet over medium heat, toss occasionally until lightly golden",
+      "time_minutes": 4,
+      "depends_on": [],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Seeds are light golden, a few may pop",
+        "audio": "Occasional popping",
+        "aroma": "Toasty, nutty"
+      },
+      "warnings": "Watch carefully - they go from toasted to burnt quickly"
+    },
+    {
+      "id": 10,
+      "instruction": "Remove sweet potatoes from oven. Slice each one open lengthwise.",
+      "time_minutes": 1,
+      "depends_on": [5],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Interior is creamy, golden-orange, may have caramelized spots",
+        "audio": null,
+        "aroma": "Intense sweet potato smell"
+      },
+      "warnings": "Potatoes are very hot - use a towel to hold them"
+    },
+    {
+      "id": 11,
+      "instruction": "Spread generous amount of miso tahini butter into each potato, letting it melt into the flesh",
+      "time_minutes": 2,
+      "depends_on": [7, 10],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Butter melts and pools into the potato",
+        "audio": null,
+        "aroma": "Savory-sweet combination"
+      },
+      "warnings": null
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Top each potato with toasted sesame seeds, a pinch or two of flaky sea salt, and fresh cilantro leaves from the small bowl. Zest a bit more lime directly over the top just before serving. Optional: sprinkle with vegan furikake or gomasio.",
+    "make_ahead": "Compound butter can be made up to 5 days ahead and refrigerated. Bring to room temperature before using. Sweet potatoes are best baked fresh.",
+    "storage": "Leftover potatoes keep refrigerated for 3 days. Store compound butter separately. Reheat potatoes in 350°F oven."
+  },
+
+  "notes": [
+    "Japanese sweet potatoes (murasaki) have purple skin and white/yellow flesh - they're drier and sweeter than orange American sweet potatoes",
+    "The 'rest in turned-off oven' step is the secret - it caramelizes the natural sugars",
+    "Compound butter ratio can be adjusted to taste - start with less miso and add more",
+    "Make extra compound butter - it's incredible on rice, roasted vegetables, or toast"
+  ]
+}

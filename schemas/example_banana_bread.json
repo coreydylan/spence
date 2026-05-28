@@ -1,0 +1,389 @@
+{
+  "id": "banana_bread",
+  "title": "Banana Bread",
+  "description": "A moist, tender quick bread with a deeply banana flavor. The riper the bananas, the better — use ones with brown spots. Ready in about an hour with 10 minutes of active work.",
+  "composition": "baked_good",
+  "category": "quick_bread",
+
+  "tags": {
+    "meal": ["breakfast", "snack", "dessert"],
+    "diet": ["vegetarian"],
+    "cuisine": "american",
+    "sweet_savory": "sweet",
+    "effort": "weeknight",
+    "season": ["year-round"]
+  },
+
+  "yield": {
+    "amount": 10,
+    "item": "slices"
+  },
+  "time": {
+    "prep_min": 15,
+    "cook_min": 55,
+    "active_min": 15,
+    "idle_min": 55,
+    "total_min": 70
+  },
+
+  "ingredient_groups": [
+    {
+      "label": "Main",
+      "items": [
+        {
+          "role": "fruit",
+          "canonical_name": "banana",
+          "consensus_qty": 3,
+          "unit": "whole",
+          "prep": "mashed (the browner the better)",
+          "importance": "core",
+          "frequency": 0.98,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "leavener",
+          "canonical_name": "baking soda",
+          "consensus_qty": 1,
+          "unit": "tsp",
+          "prep": null,
+          "importance": "core",
+          "frequency": 0.87,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "baking powder", "impact": "slightly less rise, lighter crumb", "ratio": 3.0 }
+          ]
+        },
+        {
+          "role": "thickener",
+          "canonical_name": "all-purpose flour",
+          "consensus_qty": 1.5,
+          "unit": "cup",
+          "prep": null,
+          "importance": "core",
+          "frequency": 0.81,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "whole wheat flour", "impact": "denser, nuttier", "ratio": 1.0 },
+            { "name": "almond flour", "impact": "gluten-free, moister, denser — reduce liquid by 2 tbsp", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "protein",
+          "canonical_name": "egg",
+          "consensus_qty": 2,
+          "unit": "whole",
+          "prep": null,
+          "importance": "expected",
+          "frequency": 0.72,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "flax egg", "impact": "vegan, slightly denser", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "fat",
+          "canonical_name": "butter",
+          "consensus_qty": 0.5,
+          "unit": "cup",
+          "prep": "melted and slightly cooled",
+          "importance": "expected",
+          "frequency": 0.68,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "coconut oil", "impact": "slightly firmer crumb", "ratio": 1.0 },
+            { "name": "neutral oil", "impact": "moister, longer shelf life", "ratio": 1.0 }
+          ]
+        },
+        {
+          "role": "sweetener",
+          "canonical_name": "granulated sugar",
+          "consensus_qty": 0.75,
+          "unit": "cup",
+          "prep": null,
+          "importance": "expected",
+          "frequency": 0.65,
+          "slot_position": null,
+          "alternatives": [
+            { "name": "brown sugar", "impact": "deeper flavor, chewier", "ratio": 1.0 },
+            { "name": "maple syrup", "impact": "reduce liquid by 2 tbsp elsewhere", "ratio": 0.75 }
+          ]
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "vanilla extract",
+          "consensus_qty": 1,
+          "unit": "tsp",
+          "prep": null,
+          "importance": "expected",
+          "frequency": 0.58,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "salt",
+          "consensus_qty": 0.5,
+          "unit": "tsp",
+          "prep": null,
+          "importance": "expected",
+          "frequency": 0.55,
+          "slot_position": null,
+          "alternatives": []
+        },
+        {
+          "role": "seasoning",
+          "canonical_name": "cinnamon",
+          "consensus_qty": 0.5,
+          "unit": "tsp",
+          "prep": null,
+          "importance": "optional",
+          "frequency": 0.32,
+          "slot_position": null,
+          "alternatives": []
+        }
+      ]
+    }
+  ],
+
+  "equipment": {
+    "required": ["9x5 loaf pan", "mixing bowl", "whisk", "oven"],
+    "alternatives": {
+      "9x5 loaf pan": ["8x4 loaf pan (shorter, wider, check 5 min earlier)", "muffin tin (makes 12, bake 20 min)"],
+      "whisk": ["fork", "wooden spoon"]
+    }
+  },
+
+  "steps": [
+    {
+      "index": 1,
+      "phase": "mise_en_place",
+      "primary_action": { "verb": "preheat", "technique_ref": null },
+      "secondary_actions": [{ "verb": "grease", "technique_ref": null }],
+      "ingredient_refs": [],
+      "equipment_refs": ["oven", "9x5 loaf pan"],
+      "parameters": {
+        "temperature_f": 350,
+        "heat_level": null,
+        "time": null,
+        "pan_size": "9x5"
+      },
+      "sensory_cues": { "visual": [], "tactile": [], "olfactory": [], "auditory": [] },
+      "completion_signal": null,
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": [],
+      "expected_outcome": null,
+      "idle_time_min": 10,
+      "parallel_task_hint": "While the oven heats, mash the bananas and melt the butter.",
+      "prose": {
+        "browse": "Preheat the oven to 350°F. Grease a 9x5 loaf pan (or line it with parchment, leaving an inch of overhang so you can lift the loaf out later).",
+        "cook": "350°F. Grease 9x5 pan.",
+        "terse": "Preheat 350°F. Grease pan."
+      }
+    },
+    {
+      "index": 2,
+      "phase": "prep",
+      "primary_action": { "verb": "mash", "technique_ref": "mash" },
+      "secondary_actions": [],
+      "ingredient_refs": ["banana"],
+      "equipment_refs": ["mixing bowl", "fork"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": {
+        "visual": ["mostly smooth with a few small lumps"],
+        "tactile": ["soft, spreadable texture"],
+        "olfactory": [],
+        "auditory": []
+      },
+      "completion_signal": "mostly smooth, a few small lumps are fine",
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": [],
+      "expected_outcome": "The mixture will look a little liquidy — that's normal.",
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": {
+        "browse": "In a large mixing bowl, mash 3 ripe bananas with a fork until mostly smooth — a few small lumps are fine. You should have about 1¼ cups of mashed banana.",
+        "cook": "Mash 3 bananas in a big bowl. Mostly smooth, lumps ok.",
+        "terse": "Mash bananas (~1¼ cups)."
+      }
+    },
+    {
+      "index": 3,
+      "phase": "combine",
+      "primary_action": { "verb": "whisk", "technique_ref": "whisk" },
+      "secondary_actions": [],
+      "ingredient_refs": ["butter", "egg", "granulated sugar", "vanilla extract"],
+      "equipment_refs": ["mixing bowl", "whisk"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": {
+        "visual": ["fully combined, glossy"],
+        "tactile": [],
+        "olfactory": [],
+        "auditory": []
+      },
+      "completion_signal": "fully combined",
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": [],
+      "expected_outcome": null,
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": {
+        "browse": "Whisk in the melted butter (it should be warm, not hot — hot butter will cook the eggs), then add the eggs, sugar, and vanilla. Whisk until everything is fully combined and glossy.",
+        "cook": "Add butter, eggs, sugar, vanilla. Whisk until glossy.",
+        "terse": "Whisk in butter, eggs, sugar, vanilla."
+      }
+    },
+    {
+      "index": 4,
+      "phase": "combine",
+      "primary_action": { "verb": "fold", "technique_ref": "fold" },
+      "secondary_actions": [{ "verb": "sprinkle", "technique_ref": null }],
+      "ingredient_refs": ["all-purpose flour", "baking soda", "salt", "cinnamon"],
+      "equipment_refs": ["spatula"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": null, "pan_size": null },
+      "sensory_cues": {
+        "visual": ["no dry streaks of flour visible"],
+        "tactile": [],
+        "olfactory": [],
+        "auditory": []
+      },
+      "completion_signal": "no dry streaks visible",
+      "why_critical": true,
+      "causal_rule_ref": "gluten_development",
+      "pitfall_refs": ["overmix_quick_bread"],
+      "expected_outcome": "The batter will be thick and slightly lumpy. That's what you want.",
+      "idle_time_min": null,
+      "parallel_task_hint": null,
+      "prose": {
+        "browse": "Sprinkle the flour, baking soda, salt, and cinnamon over the wet mixture. Fold with a spatula — stop as soon as you don't see dry streaks. Don't overmix; this keeps the crumb tender.",
+        "cook": "Sprinkle flour, baking soda, salt, cinnamon on top. Fold gently. Stop when no dry spots. Don't overmix.",
+        "terse": "Fold in dry ingredients. Don't overmix."
+      }
+    },
+    {
+      "index": 5,
+      "phase": "cook",
+      "primary_action": { "verb": "pour", "technique_ref": null },
+      "secondary_actions": [{ "verb": "bake", "technique_ref": "bake" }],
+      "ingredient_refs": [],
+      "equipment_refs": ["9x5 loaf pan", "oven", "toothpick"],
+      "parameters": {
+        "temperature_f": 350,
+        "heat_level": null,
+        "time": { "min": 50, "max": 60 },
+        "pan_size": "9x5"
+      },
+      "sensory_cues": {
+        "visual": ["deep golden brown top", "pulls away from the pan edges"],
+        "tactile": ["toothpick inserted in center comes out clean or with a few moist crumbs"],
+        "olfactory": ["the kitchen smells like banana"],
+        "auditory": []
+      },
+      "completion_signal": "toothpick comes out clean or with a few moist crumbs",
+      "why_critical": false,
+      "causal_rule_ref": null,
+      "pitfall_refs": ["overbake_quick_bread"],
+      "expected_outcome": null,
+      "idle_time_min": 55,
+      "parallel_task_hint": "While it bakes, clean up and start cooling a wire rack.",
+      "prose": {
+        "browse": "Pour the batter into the prepared pan and smooth the top. Bake for 50-60 minutes, until the top is deep golden brown, the loaf has pulled away from the pan edges, and a toothpick inserted in the center comes out with a few moist crumbs (but no wet batter).",
+        "cook": "Pour batter in pan. Bake 350°F, 50-60 min. Done when: golden brown top, edges pulled back, toothpick clean.",
+        "terse": "Bake 350°F, 50-60 min, until toothpick clean."
+      }
+    },
+    {
+      "index": 6,
+      "phase": "rest",
+      "primary_action": { "verb": "cool", "technique_ref": "cool" },
+      "secondary_actions": [{ "verb": "slice", "technique_ref": null }],
+      "ingredient_refs": [],
+      "equipment_refs": ["wire rack"],
+      "parameters": { "temperature_f": null, "heat_level": null, "time": { "min": 15, "max": 20 }, "pan_size": null },
+      "sensory_cues": { "visual": [], "tactile": ["cool enough to handle"], "olfactory": [], "auditory": [] },
+      "completion_signal": "cool enough to handle",
+      "why_critical": true,
+      "causal_rule_ref": "carryover_cooking_baked_goods",
+      "pitfall_refs": ["slice_hot_bread"],
+      "expected_outcome": null,
+      "idle_time_min": 15,
+      "parallel_task_hint": null,
+      "prose": {
+        "browse": "Let the loaf cool in the pan for 10 minutes, then turn it out onto a wire rack. Wait at least 15 more minutes before slicing — hot quick breads are gummy and fall apart. Serve warm or at room temperature.",
+        "cook": "Cool in pan 10 min. Turn out to rack. Wait 15 min before slicing.",
+        "terse": "Cool 15+ min before slicing."
+      }
+    }
+  ],
+
+  "variations": [
+    {
+      "label": "chocolate chip",
+      "impact": "adds sweetness and melty pockets",
+      "ingredient_additions": [
+        {
+          "role": "sweetener",
+          "canonical_name": "chocolate chips",
+          "consensus_qty": 0.75,
+          "unit": "cup",
+          "prep": null,
+          "importance": "core",
+          "frequency": 1.0,
+          "slot_position": null,
+          "alternatives": []
+        }
+      ],
+      "ingredient_swaps": [],
+      "parameter_changes": [],
+      "recipe_count": 12
+    },
+    {
+      "label": "vegan",
+      "impact": "no eggs or dairy",
+      "ingredient_additions": [],
+      "ingredient_swaps": [
+        { "from": "egg", "to": "flax egg" },
+        { "from": "butter", "to": "coconut oil" }
+      ],
+      "parameter_changes": [],
+      "recipe_count": 12
+    },
+    {
+      "label": "brown butter",
+      "impact": "nuttier, deeper flavor",
+      "ingredient_additions": [],
+      "ingredient_swaps": [
+        { "from": "butter", "to": "brown butter" }
+      ],
+      "parameter_changes": [
+        { "step_index": 0, "change": "Brown the butter first: melt in a saucepan over medium heat until it foams, subsides, and smells nutty. Cool slightly before using." }
+      ],
+      "recipe_count": 10
+    }
+  ],
+
+  "context_hooks": [
+    {
+      "trigger": { "step_index": 4, "ingredient_present": null, "user_state": "first_time_folding" },
+      "card_type": "technique",
+      "content": "Fold means cutting down through the center with a spatula, sweeping along the bottom, and lifting over — NOT stirring in circles. This keeps air in the batter.",
+      "why": "Folding is the critical technique for quick breads. Overmixing = tough crumb."
+    },
+    {
+      "trigger": { "step_index": 5, "ingredient_present": null, "user_state": null },
+      "card_type": "hook",
+      "content": "Tent with foil if the top is getting too dark before the center is done (usually around 40 min).",
+      "why": "Common pitfall — the top browns faster than the center cooks."
+    }
+  ],
+
+  "_internal": {
+    "source_recipe_ids": [45, 123, 456, "..."],
+    "confidence_score": 0.89,
+    "corpus_count": 75,
+    "last_computed": "2026-04-05T07:30:00Z"
+  }
+}

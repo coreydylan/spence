@@ -1,0 +1,345 @@
+{
+  "name": "The Best Hummus",
+  "source": "cookieandkate.com",
+  "description": "Ultra-smooth, restaurant-quality hummus with the secret of overcooked chickpeas",
+  "yield": "2 cups",
+  "timing": {
+    "prep_minutes": 10,
+    "cook_minutes": 25,
+    "total_minutes": 45,
+    "notes": "Includes 10 minute garlic mellowing time"
+  },
+
+  "equipment": [
+    {
+      "item": "Medium saucepan",
+      "required": true,
+      "notes": "For boiling chickpeas"
+    },
+    {
+      "item": "Fine mesh strainer",
+      "required": true,
+      "notes": "For draining chickpeas"
+    },
+    {
+      "item": "Food processor or high-powered blender",
+      "required": true,
+      "notes": "Food processor preferred for texture control"
+    },
+    {
+      "item": "Citrus juicer",
+      "required": false,
+      "alternative": "Squeeze lemons by hand"
+    },
+    {
+      "item": "Chef's knife",
+      "required": true,
+      "notes": "For rough-chopping garlic"
+    },
+    {
+      "item": "Cutting board",
+      "required": true,
+      "notes": null
+    },
+    {
+      "item": "Rubber spatula",
+      "required": true,
+      "notes": "For scraping down food processor"
+    },
+    {
+      "item": "Measuring cups and spoons",
+      "required": true,
+      "notes": null
+    },
+    {
+      "item": "Serving bowl or platter",
+      "required": true,
+      "notes": "For presentation"
+    },
+    {
+      "item": "Spoon",
+      "required": true,
+      "notes": "For creating swooshes on finished hummus"
+    }
+  ],
+
+  "ingredients": [
+    {
+      "item": "chickpeas",
+      "quantity_display": "1 can (15 oz)",
+      "quantity_volume": "1 1/2 cups drained",
+      "quantity_weight_g": 250,
+      "prep": "rinsed and drained",
+      "notes": "Or use 1 1/2 cups cooked from dried",
+      "category": "pantry"
+    },
+    {
+      "item": "baking soda",
+      "quantity_display": "1/2 teaspoon",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 2.5,
+      "prep": null,
+      "notes": "Only needed for canned chickpeas - helps break them down",
+      "category": "pantry"
+    },
+    {
+      "item": "lemon juice",
+      "quantity_display": "1/4 cup",
+      "quantity_volume": "1/4 cup (from 1 1/2 - 2 lemons)",
+      "quantity_weight_g": 60,
+      "prep": "freshly squeezed",
+      "notes": "Plus more to taste - fresh only, not bottled",
+      "category": "produce"
+    },
+    {
+      "item": "garlic",
+      "quantity_display": "1 medium-to-large clove",
+      "quantity_volume": "1 teaspoon chopped",
+      "quantity_weight_g": 5,
+      "prep": "roughly chopped",
+      "notes": "Mellowing in lemon juice tames the raw bite",
+      "category": "produce"
+    },
+    {
+      "item": "fine sea salt",
+      "quantity_display": "1/2 teaspoon",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 3,
+      "prep": null,
+      "notes": "Plus more to taste",
+      "category": "spices"
+    },
+    {
+      "item": "tahini",
+      "quantity_display": "1/2 cup",
+      "quantity_volume": "1/2 cup",
+      "quantity_weight_g": 120,
+      "prep": null,
+      "notes": "Stir well before measuring - oil separates",
+      "category": "pantry"
+    },
+    {
+      "item": "ice water",
+      "quantity_display": "2-4 tablespoons",
+      "quantity_volume": "2-4 tablespoons",
+      "quantity_weight_g": 60,
+      "prep": null,
+      "notes": "Ice water makes hummus fluffier",
+      "category": "other"
+    },
+    {
+      "item": "ground cumin",
+      "quantity_display": "1/2 teaspoon",
+      "quantity_volume": "1/2 teaspoon",
+      "quantity_weight_g": 1.5,
+      "prep": null,
+      "notes": null,
+      "category": "spices"
+    },
+    {
+      "item": "extra-virgin olive oil",
+      "quantity_display": "1 tablespoon",
+      "quantity_volume": "1 tablespoon + more for drizzling",
+      "quantity_weight_g": 14,
+      "prep": null,
+      "notes": "Good quality for finishing",
+      "category": "oils-vinegars"
+    },
+    {
+      "item": "paprika or sumac",
+      "quantity_display": "for garnish",
+      "quantity_volume": "pinch",
+      "quantity_weight_g": 0.5,
+      "prep": null,
+      "notes": "Optional - for color",
+      "category": "spices"
+    },
+    {
+      "item": "fresh parsley",
+      "quantity_display": "for garnish",
+      "quantity_volume": "1 tablespoon chopped",
+      "quantity_weight_g": 5,
+      "prep": "chopped",
+      "notes": "Optional",
+      "category": "produce"
+    }
+  ],
+
+  "prep_steps": [
+    {
+      "id": 1,
+      "instruction": "Set up your staging area: get out the food processor, a medium bowl for prepping, and your measuring cups and spoons. Prepare a cup of ice water.",
+      "outputs": ["staging area ready", "ice water ready"],
+      "container": null,
+      "station": "setup",
+      "time_minutes": 2,
+      "notes": "Ice water is the secret to fluffy hummus"
+    },
+    {
+      "id": 2,
+      "instruction": "Open and drain the can of chickpeas into a strainer. Rinse under cold water.",
+      "outputs": ["drained chickpeas"],
+      "container": "strainer",
+      "station": "sink",
+      "time_minutes": 1,
+      "notes": null
+    },
+    {
+      "id": 3,
+      "instruction": "Juice the lemons - you need 1/4 cup (about 1 1/2 to 2 lemons). Pour into the food processor bowl.",
+      "outputs": ["lemon juice in processor"],
+      "container": "food processor",
+      "station": "knife",
+      "time_minutes": 2,
+      "notes": "Fresh lemon juice only - bottled won't give the same brightness"
+    },
+    {
+      "id": 4,
+      "instruction": "Roughly chop the garlic clove and add to the food processor with the lemon juice and salt",
+      "outputs": ["garlic mellowing"],
+      "container": "food processor",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Garlic will mellow while other prep happens"
+    },
+    {
+      "id": 5,
+      "instruction": "Measure tahini and have ready near the food processor",
+      "outputs": ["measured tahini"],
+      "container": "measuring cup",
+      "station": "measuring",
+      "time_minutes": 1,
+      "notes": "Stir tahini well in jar before measuring - oil separates"
+    },
+    {
+      "id": 6,
+      "instruction": "If using parsley for garnish, chop it and set aside in a small bowl",
+      "outputs": ["chopped parsley"],
+      "container": "small bowl",
+      "station": "knife",
+      "time_minutes": 1,
+      "notes": "Optional"
+    }
+  ],
+
+  "cook_steps": [
+    {
+      "id": 1,
+      "instruction": "Transfer drained chickpeas to medium saucepan. Add baking soda and cover with several inches of water. Bring to a boil over high heat.",
+      "time_minutes": 5,
+      "depends_on": [],
+      "uses_outputs": ["drained chickpeas"],
+      "cues": {
+        "visual": "Water comes to a rolling boil, foam may form on surface",
+        "audio": "Active bubbling",
+        "aroma": null
+      },
+      "warnings": "Watch for boil-over - reduce heat if foam rises too high"
+    },
+    {
+      "id": 2,
+      "instruction": "Continue boiling for about 20 minutes until chickpeas are very soft, bloated, and skins are falling off",
+      "time_minutes": 20,
+      "depends_on": [1],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Chickpeas look bloated, many skins floating loose, chickpeas crush easily between fingers",
+        "audio": "Continued bubbling",
+        "aroma": null
+      },
+      "warnings": "You want them overcooked - this is the secret to smooth hummus. Test by crushing one between fingers - it should mash with no resistance."
+    },
+    {
+      "id": 3,
+      "instruction": "Drain chickpeas in fine mesh strainer. Run cool water over them for about 30 seconds. Let drain while you proceed.",
+      "time_minutes": 1,
+      "depends_on": [2],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Chickpeas have cooled slightly, loose skins visible",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "No need to peel chickpeas for this recipe - overboiling does the work"
+    },
+    {
+      "id": 4,
+      "instruction": "Process lemon juice, garlic, and salt in food processor until garlic is very finely chopped. Let rest 10 minutes to mellow the garlic.",
+      "time_minutes": 10,
+      "depends_on": [],
+      "uses_outputs": ["garlic mellowing"],
+      "cues": {
+        "visual": "Garlic is minced into tiny pieces, suspended in lemon juice",
+        "audio": null,
+        "aroma": "Sharp garlic smell will mellow during rest"
+      },
+      "warnings": "The 10-minute rest tames the raw garlic bite - don't skip it"
+    },
+    {
+      "id": 5,
+      "instruction": "Add tahini to food processor. Blend until mixture is thick and creamy, scraping down sides as needed.",
+      "time_minutes": 2,
+      "depends_on": [4],
+      "uses_outputs": ["measured tahini"],
+      "cues": {
+        "visual": "Pale, thick, creamy paste - almost like frosting",
+        "audio": "Processor working hard",
+        "aroma": "Nutty tahini smell"
+      },
+      "warnings": null
+    },
+    {
+      "id": 6,
+      "instruction": "With processor running, drizzle in 2 tablespoons ice water. Scrape down and blend until mixture is ultra smooth, pale, and creamy. Add more ice water if needed.",
+      "time_minutes": 2,
+      "depends_on": [5],
+      "uses_outputs": ["ice water ready"],
+      "cues": {
+        "visual": "Very pale, fluffy texture - noticeably lighter in color",
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Ice water makes hummus fluffy - don't use room temperature water"
+    },
+    {
+      "id": 7,
+      "instruction": "Add cumin and drained chickpeas to the food processor. While blending, drizzle in olive oil. Process until super smooth, about 2 minutes, scraping down sides as needed.",
+      "time_minutes": 3,
+      "depends_on": [3, 6],
+      "uses_outputs": [],
+      "cues": {
+        "visual": "Completely smooth with no visible chickpea chunks, silky texture",
+        "audio": "Smooth whirring sound",
+        "aroma": "Full hummus aroma emerges"
+      },
+      "warnings": "Don't under-process - smoothness takes time. Add another tablespoon of ice water if mixture seems too thick."
+    },
+    {
+      "id": 8,
+      "instruction": "Taste and adjust: add another 1/4 teaspoon salt for more overall flavor, another tablespoon lemon juice for brightness, or more tahini for richness",
+      "time_minutes": 2,
+      "depends_on": [7],
+      "uses_outputs": [],
+      "cues": {
+        "visual": null,
+        "audio": null,
+        "aroma": null
+      },
+      "warnings": "Season generously - hummus should be vibrant, not flat"
+    }
+  ],
+
+  "finishing": {
+    "instructions": "Transfer hummus to serving bowl or platter. Use back of spoon to create swooshes and a well in the center. Drizzle generously with olive oil into the well. Sprinkle with paprika or sumac for color. Scatter chopped parsley if desired. Serve with warm pita, vegetables, or as part of a mezze spread.",
+    "make_ahead": "Hummus improves over several hours as flavors meld. Make up to 5 days ahead.",
+    "storage": "Keep refrigerated in airtight container for up to 1 week. Drizzle with olive oil before storing to prevent drying. Bring to room temperature or warm slightly before serving for best texture."
+  },
+
+  "notes": [
+    "The secret to smooth hummus is OVERCOOKING the chickpeas - they should be falling apart",
+    "Ice water makes hummus fluffy and light - don't skip this step",
+    "Letting garlic sit in lemon juice mellows its raw bite",
+    "Use good tahini - it should be pourable and taste like sesame, not bitter",
+    "Season boldly - under-seasoned hummus tastes flat"
+  ]
+}

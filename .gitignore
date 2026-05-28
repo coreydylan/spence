@@ -52,6 +52,12 @@ Carthage/Build/
 *.swo
 *~
 
+# Large data folder (backed up to B2 bucket: spence-data-pipeline)
+data-pipeline/
+
+# Xcode build artifacts
+ios/build/
+
 # Secrets
 *.pem
 *.p12
